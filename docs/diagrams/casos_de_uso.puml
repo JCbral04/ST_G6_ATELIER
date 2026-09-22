@@ -1,0 +1,57 @@
+@startuml
+!theme plain
+title Diagrama de Casos de Uso - ATELIER
+
+left to right direction
+
+actor "Cliente / Vendedor" as cli
+actor "Administrador" as adm
+actor "Power BI" as pbi
+
+rectangle "ATELIER - ERP Tienda de Ropa" {
+
+  usecase "UC-01: Registrarse e iniciar sesion" as UC01
+  usecase "UC-02: Consultar catalogo de productos" as UC02
+  usecase "UC-03: Filtrar productos\n(categoria, talla, color, precio)" as UC03
+  usecase "UC-04: Gestionar carrito de compras" as UC04
+  usecase "UC-05: Realizar compra" as UC05
+  usecase "UC-06: Consultar historial de pedidos" as UC06
+  usecase "UC-07: Gestionar productos (CRUD)" as UC07
+  usecase "UC-08: Gestionar categorias, tallas y colores" as UC08
+  usecase "UC-09: Controlar inventario\n(entradas / salidas / stock minimo)" as UC09
+  usecase "UC-10: Gestionar pedidos y estados" as UC10
+  usecase "UC-11: Gestionar proveedores" as UC11
+  usecase "UC-12: Gestionar compras a proveedores" as UC12
+  usecase "UC-13: Administrar usuarios y roles" as UC13
+  usecase "UC-14: Generar reportes gerenciales" as UC14
+
+  cli --> UC01
+  cli --> UC02
+  cli --> UC04
+  cli --> UC05
+  cli --> UC06
+
+  adm --> UC07
+  adm --> UC08
+  adm --> UC09
+  adm --> UC10
+  adm --> UC11
+  adm --> UC12
+  adm --> UC13
+
+  UC03 ..> UC02 : <<extend>>
+  UC05 ..> UC01 : <<include>>
+  UC05 ..> UC09 : <<include>>
+  UC06 ..> UC01 : <<include>>
+  UC07 ..> UC01 : <<include>>
+  UC09 ..> UC01 : <<include>>
+  UC12 ..> UC09 : <<include>>
+  pbi --> UC14
+}
+
+note right of UC05
+  Al confirmarse la compra se
+  actualiza el inventario
+  automaticamente (UC-09)
+end note
+@enduml

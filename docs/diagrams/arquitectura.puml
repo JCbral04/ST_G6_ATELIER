@@ -1,0 +1,32 @@
+@startuml
+!theme plain
+title Diagrama de Arquitectura - ATELIER (Tres capas + MVC)
+
+actor "Cliente / Vendedor" as cli
+actor "Administrador" as adm
+node "Power BI" as pbi
+
+package "Capa de Presentacion" {
+  [SPA React\n(Vistas: Login, Catalogo,\nCarrito, Panel Admin)] as FE
+}
+
+package "Capa de Logica de Negocio - API REST" {
+  [Controladores\n(Endpoints HTTP)] as C
+  [Servicios\n(Reglas de negocio)] as S
+  C --> S
+}
+
+package "Capa de Datos" {
+  [Repositorios / ORM] as R
+  database "PostgreSQL / MySQL" as DB
+  R --> DB
+}
+
+cli --> FE
+adm --> FE
+FE --> C : HTTP / JSON (REST)
+S --> R
+pbi --> DB : Conector SQL (solo lectura)
+
+note bottom of pbi : Reportes gerenciales\n(actualizacion programada)
+@enduml

@@ -1,0 +1,146 @@
+@startuml
+!theme plain
+title Diagrama de Clases - ATELIER
+
+abstract class Usuario {
+  - idUsuario: int
+  - nombre: String
+  - correo: String
+  - contrasenaHash: String
+  - rol: Rol
+  - activo: boolean
+  + autenticar(correo, pass): boolean
+  + cerrarSesion(): void
+}
+
+class Cliente {
+  - direccion: String
+  - telefono: String
+  + registrar(): void
+  + consultarHistorial(): List<Pedido>
+}
+
+class Administrador {
+  + gestionarCatalogo(): void
+  + controlarInventario(): void
+  + administrarUsuarios(): void
+}
+
+class Categoria {
+  - idCategoria: int
+  - nombre: String
+  - descripcion: String
+}
+
+class Producto {
+  - idProducto: int
+  - nombre: String
+  - descripcion: String
+  - precio: decimal
+  - activo: boolean
+  + calcularPrecio(): decimal
+}
+
+class Talla {
+  - idTalla: int
+  - codigo: String
+}
+
+class Color {
+  - idColor: int
+  - nombre: String
+  - hex: String
+}
+
+class VarianteProducto {
+  - idVariante: int
+  - sku: String
+  - stockActual: int
+  - stockMinimo: int
+  + descontarStock(cantidad): boolean
+  + alertaStockMinimo(): boolean
+}
+
+class MovimientoInventario {
+  - idMovimiento: int
+  - tipo: TipoMovimiento
+  - cantidad: int
+  - fecha: DateTime
+  - motivo: String
+  + registrar(): void
+}
+
+class Carrito {
+  - idCarrito: int
+  - fechaCreacion: DateTime
+  + agregarItem(variante, cantidad): void
+  + calcularTotal(): decimal
+  + vaciar(): void
+}
+
+class ItemCarrito {
+  - idItem: int
+  - cantidad: int
+  - subtotal: decimal
+}
+
+class Pedido {
+  - idPedido: int
+  - fecha: DateTime
+  - estado: EstadoPedido
+  - total: decimal
+  + confirmar(): void
+  + cambiarEstado(estado): void
+}
+
+class DetallePedido {
+  - idDetalle: int
+  - cantidad: int
+  - precioUnitario: decimal
+  - subtotal: decimal
+}
+
+class Proveedor {
+  - idProveedor: int
+  - nombre: String
+  - nit: String
+  - telefono: String
+  - correo: String
+}
+
+class Compra {
+  - idCompra: int
+  - fecha: DateTime
+  - estado: EstadoCompra
+  - total: decimal
+  + registrarRecepcion(): void
+}
+
+class DetalleCompra {
+  - idDetalle: int
+  - cantidad: int
+  - costoUnitario: decimal
+  - subtotal: decimal
+}
+
+Usuario <|-- Cliente
+Usuario <|-- Administrador
+Categoria "1" o-- "0..*" Producto
+Producto "1" *-- "1..*" VarianteProducto
+Talla "1" --> "0..*" VarianteProducto
+Color "1" --> "0..*" VarianteProducto
+VarianteProducto "1" o-- "0..*" MovimientoInventario
+Cliente "1" o-- "0..1" Carrito
+Carrito "1" *-- "0..*" ItemCarrito
+ItemCarrito "*" --> "1" VarianteProducto
+Cliente "1" o-- "0..*" Pedido
+Pedido "1" *-- "1..*" DetallePedido
+DetallePedido "*" --> "1" VarianteProducto
+Administrador "1" --> "0..*" MovimientoInventario : registra
+Proveedor "1" o-- "0..*" Compra
+Compra "1" *-- "1..*" DetalleCompra
+DetalleCompra "*" --> "1" VarianteProducto
+Administrador "1" --> "0..*" Compra : gestiona
+
+note right of Usuario : Herencia: Cliente y\nAdministrador especializan\nel comportamiento de Usuario
+@enduml

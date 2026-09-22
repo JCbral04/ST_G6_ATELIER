@@ -1,0 +1,137 @@
+@startuml
+!theme plain
+title Modelo Relacional - ATELIER
+hide circle
+
+entity USUARIOS {
+  * **id_usuario** : INT <<PK>>
+  --
+  nombre : VARCHAR(100)
+  correo : VARCHAR(120) <<UNIQUE>>
+  contrasena_hash : VARCHAR(255)
+  rol : ENUM(cliente, administrador)
+  telefono : VARCHAR(20)
+  activo : BOOLEAN
+  fecha_registro : DATETIME
+}
+
+entity CATEGORIAS {
+  * **id_categoria** : INT <<PK>>
+  --
+  nombre : VARCHAR(80)
+  descripcion : VARCHAR(255)
+}
+
+entity PRODUCTOS {
+  * **id_producto** : INT <<PK>>
+  --
+  id_categoria : INT <<FK>>
+  nombre : VARCHAR(120)
+  descripcion : VARCHAR(255)
+  precio : DECIMAL(10,2)
+  activo : BOOLEAN
+}
+
+entity TALLAS {
+  * **id_talla** : INT <<PK>>
+  --
+  codigo : VARCHAR(10)
+}
+
+entity COLORES {
+  * **id_color** : INT <<PK>>
+  --
+  nombre : VARCHAR(40)
+  hex : CHAR(7)
+}
+
+entity VARIANTES_PRODUCTO {
+  * **id_variante** : INT <<PK>>
+  --
+  id_producto : INT <<FK>>
+  id_talla : INT <<FK>>
+  id_color : INT <<FK>>
+  sku : VARCHAR(50) <<UNIQUE>>
+  stock_actual : INT
+  stock_minimo : INT
+}
+
+entity MOVIMIENTOS_INVENTARIO {
+  * **id_movimiento** : INT <<PK>>
+  --
+  id_variante : INT <<FK>>
+  id_usuario : INT <<FK>>
+  tipo : ENUM(entrada, salida)
+  cantidad : INT
+  motivo : VARCHAR(255)
+  fecha : DATETIME
+}
+
+entity PEDIDOS {
+  * **id_pedido** : INT <<PK>>
+  --
+  id_usuario : INT <<FK>>
+  fecha : DATETIME
+  estado : ENUM(pendiente, confirmado,\nenviado, entregado, cancelado)
+  total : DECIMAL(10,2)
+}
+
+entity DETALLE_PEDIDO {
+  * **id_detalle** : INT <<PK>>
+  --
+  id_pedido : INT <<FK>>
+  id_variante : INT <<FK>>
+  cantidad : INT
+  precio_unitario : DECIMAL(10,2)
+  subtotal : DECIMAL(10,2)
+}
+
+entity PROVEEDORES {
+  * **id_proveedor** : INT <<PK>>
+  --
+  nombre : VARCHAR(120)
+  nit : VARCHAR(20) <<UNIQUE>>
+  telefono : VARCHAR(20)
+  correo : VARCHAR(120)
+}
+
+entity COMPRAS {
+  * **id_compra** : INT <<PK>>
+  --
+  id_proveedor : INT <<FK>>
+  id_usuario : INT <<FK>>
+  fecha : DATETIME
+  estado : ENUM(solicitada, recibida)
+  total : DECIMAL(10,2)
+}
+
+entity DETALLE_COMPRA {
+  * **id_detalle** : INT <<PK>>
+  --
+  id_compra : INT <<FK>>
+  id_variante : INT <<FK>>
+  cantidad : INT
+  costo_unitario : DECIMAL(10,2)
+  subtotal : DECIMAL(10,2)
+}
+
+USUARIOS ||--o{ PEDIDOS : "realiza (1:N)"
+USUARIOS ||--o{ MOVIMIENTOS_INVENTARIO : "registra (1:N)"
+USUARIOS ||--o{ COMPRAS : "gestiona (1:N)"
+CATEGORIAS ||--o{ PRODUCTOS : "clasifica (1:N)"
+PRODUCTOS ||--|{ VARIANTES_PRODUCTO : "se compone (1:N)"
+TALLAS ||--o{ VARIANTES_PRODUCTO : "(1:N)"
+COLORES ||--o{ VARIANTES_PRODUCTO : "(1:N)"
+VARIANTES_PRODUCTO ||--o{ MOVIMIENTOS_INVENTARIO : "afecta (1:N)"
+PEDIDOS ||--|{ DETALLE_PEDIDO : "contiene (1:N)"
+VARIANTES_PRODUCTO ||--o{ DETALLE_PEDIDO : "se vende (1:N)"
+PROVEEDORES ||--o{ COMPRAS : "surte (1:N)"
+COMPRAS ||--|{ DETALLE_COMPRA : "contiene (1:N)"
+VARIANTES_PRODUCTO ||--o{ DETALLE_COMPRA : "se compra (1:N)"
+
+note bottom of VARIANTES_PRODUCTO
+  stock_actual se actualiza por
+  trigger/procedimiento ante cada
+  venta, compra o movimiento
+end note
+@enduml
