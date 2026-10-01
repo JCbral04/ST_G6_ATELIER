@@ -9,7 +9,7 @@ entity USUARIOS {
   nombre : VARCHAR(100)
   correo : VARCHAR(120) <<UNIQUE>>
   contrasena_hash : VARCHAR(255)
-  rol : ENUM(cliente, administrador)
+  rol : ENUM(cliente, vendedor, administrador)
   telefono : VARCHAR(20)
   activo : BOOLEAN
   fecha_registro : DATETIME
@@ -29,6 +29,8 @@ entity PRODUCTOS {
   nombre : VARCHAR(120)
   descripcion : VARCHAR(255)
   precio : DECIMAL(10,2)
+  imagen_url : VARCHAR(255)
+  stock_minimo : INT
   activo : BOOLEAN
 }
 
@@ -52,8 +54,23 @@ entity VARIANTES_PRODUCTO {
   id_talla : INT <<FK>>
   id_color : INT <<FK>>
   sku : VARCHAR(50) <<UNIQUE>>
-  stock_actual : INT
-  stock_minimo : INT
+  stock : INT
+}
+
+entity CARRITO_COMPRA {
+  * **id_carrito** : INT <<PK>>
+  --
+  id_usuario : INT <<FK>>
+  fecha_creacion : DATETIME
+  activo : BOOLEAN
+}
+
+entity ITEM_CARRITO {
+  * **id_item** : INT <<PK>>
+  --
+  id_carrito : INT <<FK>>
+  id_variante : INT <<FK>>
+  cantidad : INT
 }
 
 entity MOVIMIENTOS_INVENTARIO {
@@ -72,7 +89,7 @@ entity PEDIDOS {
   --
   id_usuario : INT <<FK>>
   fecha : DATETIME
-  estado : ENUM(pendiente, confirmado,\nenviado, entregado, cancelado)
+  estado : ENUM(pendiente, confirmado,\ndespachado, entregado, cancelado)
   total : DECIMAL(10,2)
 }
 
@@ -116,12 +133,15 @@ entity DETALLE_COMPRA {
 }
 
 USUARIOS ||--o{ PEDIDOS : "realiza (1:N)"
+USUARIOS ||--o{ CARRITO_COMPRA : "posee (1:N)"
 USUARIOS ||--o{ MOVIMIENTOS_INVENTARIO : "registra (1:N)"
 USUARIOS ||--o{ COMPRAS : "gestiona (1:N)"
 CATEGORIAS ||--o{ PRODUCTOS : "clasifica (1:N)"
 PRODUCTOS ||--|{ VARIANTES_PRODUCTO : "se compone (1:N)"
 TALLAS ||--o{ VARIANTES_PRODUCTO : "(1:N)"
 COLORES ||--o{ VARIANTES_PRODUCTO : "(1:N)"
+CARRITO_COMPRA ||--|{ ITEM_CARRITO : "contiene (1:N)"
+VARIANTES_PRODUCTO ||--o{ ITEM_CARRITO : "se agrega (1:N)"
 VARIANTES_PRODUCTO ||--o{ MOVIMIENTOS_INVENTARIO : "afecta (1:N)"
 PEDIDOS ||--|{ DETALLE_PEDIDO : "contiene (1:N)"
 VARIANTES_PRODUCTO ||--o{ DETALLE_PEDIDO : "se vende (1:N)"
@@ -130,7 +150,7 @@ COMPRAS ||--|{ DETALLE_COMPRA : "contiene (1:N)"
 VARIANTES_PRODUCTO ||--o{ DETALLE_COMPRA : "se compra (1:N)"
 
 note bottom of VARIANTES_PRODUCTO
-  stock_actual se actualiza por
+  stock se actualiza por
   trigger/procedimiento ante cada
   venta, compra o movimiento
 end note
