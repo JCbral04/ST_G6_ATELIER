@@ -2,6 +2,6 @@
 * @JCbral04
 
 # Revisores por módulo — descomentar y ajustar con los usernames reales:
-#/docs/    @JCbral04 @puringu @StevenRusinque07
-#/backend/ @JCbral04 @StevenRusinque07
-#/db/      @JCbral04 @puringu
+/docs/    @JCbral04 @StevenRusinque07 # @puringu (Comentado dado que aun no acepta invitacion)
+/backend/ @JCbral04 @StevenRusinque07
+/db/      @JCbral04 # @puringu (Comentado dado que aun no acepta invitacion)
