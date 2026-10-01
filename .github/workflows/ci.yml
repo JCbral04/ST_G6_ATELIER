@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# Mínimo privilegio: denegar TODOS los permisos por defecto.
+permissions: {}
+
+jobs:
+  backend:
+    name: Build y pruebas — Backend (Node.js)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # solo lectura para clonar el código
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # no dejar el token en .git/config
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Linter
+        run: npm run lint --if-present
+
+      - name: Pruebas
+        run: npm test --if-present
+
+  database:
+    name: Validación de esquema — PostgreSQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Ejecutar schema.sql
+        run: psql -h localhost -U postgres -f db/schema.sql
+        env:
+          PGPASSWORD: postgres
+
+      - name: Ejecutar seed.sql
+        run: psql -h localhost -U postgres -d atelier_db -f db/seed.sql
+        env:
+          PGPASSWORD: postgres

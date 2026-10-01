@@ -1,0 +1,27 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Despliegue
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: production   # permite exigir aprobación manual en Settings → Environments
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Ejemplo con Render Deploy Hook (URL guardada como secreto RENDER_DEPLOY_HOOK):
+      # - name: Disparar despliegue en Render
+      #   run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
+      - name: Placeholder — definir destino de despliegue
+        run: echo "Configurar despliegue (Render / Railway / Azure) en la Fase 6"
