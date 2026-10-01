@@ -79,9 +79,7 @@ Desarrollar un ERP que permita gestionar de manera eficiente e integrada los pro
 
 El sistema adopta una **arquitectura de tres capas** (presentación, lógica de negocio y datos), complementada con el **patrón MVC** (Modelo–Vista–Controlador) en la capa de aplicación, y un estilo **cliente-servidor** para la comunicación entre el navegador y el servidor mediante una API REST.
 
-<!-- DIAGRAMA 1 DE 4: ARQUITECTURA DE SOFTWARE - enlace de PlantUML -->
-> 
-![Diagrama de Arquitectura](//www.plantuml.com/plantuml/png/RP91azCm38Nl_XMYftPeX_iUcEscsQ5CknkIJYyi1pKHmODZ1Lk50OR_ZgAs9pXLZP-_PptfFWicEG_1lP8lD12C0NrquYKGR3ps2GU4Zc2TlfszK2ldXB22zQ7SRSiQveT46LeSCSDhs1-BXNFO2YUO5S5J588tSAJOKSTf1gZQu6-ATJVuwBCal1rYDxZ8QZUh-0SbUDZQv_7adHkn_OezAHX7UrAbrkg0hUSuWzyEu6DJhQ4cnR_4-L79cEzWnxsFIoXGC73FovTOO4fUU0aLHWfWprXycemUI_VdNoT3j5OzKS_gDoLGRQ4kcyFLkU0eYSFK2MLrBsCtie-IuTtXK5teXJsHqdUlY4bKKnymJznuuLvqZUeAMAtUQlM_vsnGE5zzQnevU-6aH8twkTuRejQp3WLFc2tCB7sYviDE9VkV-cknRXvKLPkHbkgaix5_6eDEubO-bbOLS6UzAE9zy_m4ywdxXMlii7Oweoj9TPe6sOmdotdcm10kkwFx4La8JYp20_3dQRXwO-eZ2MNeAL5iFGQB4VKI1l_BXWnZObl8JZ7t53lTsxy0)
+![Diagrama de Arquitectura](diagrams/arquitectura.png)
 
 ### 4.2 Componentes principales del sistema
 
@@ -107,7 +105,7 @@ El sistema adopta una **arquitectura de tres capas** (presentación, lógica de 
 La arquitectura de tres capas es adecuada para ATELIER porque:
 
 - **Separación de responsabilidades:** la interfaz, las reglas de negocio y los datos evolucionan de forma independiente, lo que facilita el mantenimiento.
-- **Consistencia transaccional:** al concentrar las reglas de negocio (stock, estados de pedido) en una sola capa, se garantiza la integridad que exige un sistema transaccional.
+- **Gestión de la consistencia transaccional:** concentrar las reglas de negocio (stock, estados de pedido) en una sola capa facilita la gestión de la integridad que exige un sistema transaccional. La consistencia efectiva no la provee la arquitectura por sí misma: dependerá de la implementación posterior de transacciones, restricciones de integridad (PK, FK, CHECK) y mecanismos de control de concurrencia en la capa de datos.
 - **Escalabilidad:** permite crecer de forma horizontal en la capa de presentación sin modificar la lógica ni los datos.
 - **Compatibilidad con Power BI:** la separación de la capa de datos permite que la herramienta de analítica lea directamente el modelo relacional.
 - **Madurez y soporte:** es un modelo ampliamente documentado, con abundantes frameworks y buenas prácticas disponibles para el equipo.
@@ -124,16 +122,7 @@ La arquitectura de tres capas es adecuada para ATELIER porque:
 | **Administrador** | Responsable de la gestión integral: productos, inventario, ventas, compras, proveedores, usuarios y reportes. |
 | **Power BI** *(sistema externo)* | Consume los datos del ERP para la generación de tableros gerenciales. |
 
-<!-- DIAGRAMA 2 DE 4: CASOS DE USO UML — debe incluir actores, casos de uso, límite del sistema y relaciones include/extend -->
->
-> Relaciones «include»/«extend» sugeridas para el diagrama:
->
-> - `Realizar compra` —**«include»**→ `Autenticarse` y —**«include»**→ `Validar disponibilidad de stock`
-> - `Controlar inventario` —**«include»**→ `Generar alerta de stock mínimo`
-> - `Registrar movimiento de inventario` —**«extend»**→ `Generar alerta de stock mínimo`
-> - `Consultar catálogo` —**«extend»**→ `Filtrar productos`
-
-![Diagrama de Casos de Uso](//www.plantuml.com/plantuml/png/VLHDJnin4BtxLqnp0eb0DXy9YH221beXzO0YqbClKti8ethjoFRIZwh_lLwJJNPToYcUVVFclPdOS-K3kb2LMhmBJrGIR3Mo4O639hXXt3Wi4HJ14htrzM7jBVJX-k7sqztjIWXDZm621SURfm2A7Sd0rWY1CbW7lQLcCe7W33wJKQIiwm5wa9gRZ6jLic4V73OWgh81x-rtSl3-BdtVVcKXQW4q6qtGsvc8TcvNz_30KI1vNTajzk2t402L9ua-vgwN_K6nW1LjafJp10HHLp8wyEIZvwInNWwAd3TSmD8QN-aGSoK6r7PZQw6jiwgAHdr37URKqG8-iAu53ybVp54iGXlh64yWLjFnHrfjtKbC8idskAatokkD5_2HV3tXPCKv3ic9jENMuTx7EETDwjPHyozqkzmcTPAdJjlTFh4FjK-TsYN5wj3iD6VE3kPQxSBHShM-sRSqorddRTP-C7ut6Gy_NsP3UztplC8yEGxEQdJ0vfbCjCuspZcU7Af8EmEFcdUdOEKtg2zTUPZqF2jQ33hDfCvhB_4J7cPG379QaStWcKYrp1T5JXYs2CtV2FWQTPXJu-KwF1uNiGeT9vVEwWDlbFFI9J9KSnnjhGlaOKEEZ6HiySOY4gLcwFSlqxleXiDkEEw6asuuhMkXAfjurWtFk-6y4nQ3RbXqms4t74Mbz7JWzFJ59opWue9-13Bgyl85d3HWaK0sKbUA_a7dhw7JDxcpDz7vMsWn_BzkN7rDWsFnHmXZ0-rshdrivdsjGLhpoAvC-qtZxZw1fuYY35NQ042wzKfgf0gsnC0IoxIhZzAZEXPa5DH2uYgUgbB_1G00)
+![Diagrama de Casos de Uso](diagrams/casos_de_uso.png)
 
 ### 5.2 Descripción de los casos de uso principales
 
@@ -196,10 +185,7 @@ La arquitectura de tres capas es adecuada para ATELIER porque:
 
 ## 6. Diagrama de clases UML
 
-<!-- DIAGRAMA 3 DE 4: DIAGRAMA DE CLASES UML — incluir atributos, métodos, relaciones, multiplicidades y la herencia de Usuario -->
-> 
-
-![Diagrama de Arquitectura](//www.plantuml.com/plantuml/png/fLPDRziu4BtpLt1pyYPriRaQHT702P02BH0axfvw6LCJUr2AD8OZOpzs__jI52s6ikD5q8kb-U3ZuzFCq9-204lNMlMBRB55lRD0JWc9HNrBi65eGJUebnO21ZtNDwkxBv_l7fM2TH068zh4KD3VGWTCNl-jTCoY9jiBJKwIo_bspRZGJyBaDibbF3FwYSj5r80ExY5ign1xkz2FtYO3ZD0-BbrxRn5Sz5rfw0ITa06U3SZlz2vI-xNECiWC_8I1l9l5sDvJe_vLQZZ6qbB4m7oCXXYDYOaL4K6BpzuLuZqiuuPwGNZ4J9jv5pehmFSnw9d0zk4lqVZmW0qr_cFP-gPfoIMCndCYSAKt68Iy0rw2WFKRFqKNzXRuizkZ4s2gup0YSluSuSI9GN3JKni_tUWv-_4Q38PfLwapWZwmRpeZfHmEZZT05l-EqVIbrCH72wyNW05hEWlyqESdAVAAGcm5rfQJ9gjGChwXZJy-pT9Rp-EYP9qznnR_E0Rv7PZ02Hv9SmWKoF2Zg_22UFFZnaW7DYKLvrTor8wYNYK5VLy9JtrqPY8kDT1CMW0iii1J0PYLX4BugzzJstU37ykha2x1maXe5wrL_2tH53ZGAAdFQBPH-5iGN56BoTTweVtvfghAbfca4ChsP8ib8wHoAbib0JOHERQDO3lRP_dVZJJpNbL9hRo0VL5HARYFsAUuzRXJVhsla3jM97HhwVSuKRDfKXIamJol9GQ1FkSkFOSLAJ3P8q-HP-9sEhcWNHFm030Ry8uEUeiHpUA4OFQUEMtkw6-E1BZkxFDAiDyZDY-QSVISRKX7Sdw2Js-ZkllR7PUPCPXlaNzOyOhyfSOVqM2QVRFNT1w0tgApyK7U8lFX5l_mptn-k0jhPtLBgN9vN5nVQ1_Z5x-zVtzvCLu0wl2I4YxxXEkKC1s7AitYb3MVVymmnrbf-FvlrjGnPNTgjAbyt2etlkP6LkbPpf6XNlQwAkynxJ9Jl3xcLszLi7AVfiTKiBhNL6MTtwpwObFfJWxvnLYKgdJSX6ikwk7n2jUSKra_mJK3BCP_HKevBwYPDblH_ddy3xhGzyZe3C527wJ-yxkhmJ7iC6PO-WlSTuTMcmZlMM2GGpTum5EVq3LTQ_y3)
+![Diagrama de Clases](diagrams/diagrama_de_clases.png)
 
 ### 6.1 Clases principales del sistema
 
@@ -248,10 +234,7 @@ La arquitectura de tres capas es adecuada para ATELIER porque:
 
 ## 7. Modelo relacional
 
-<!-- DIAGRAMA 4 DE 4: MODELO RELACIONAL / DIAGRAMA ER — incluir tablas, campos, PK, FK, relaciones y cardinalidades -->
->
-
-![Modelo Relacional](//www.plantuml.com/plantuml/png/fLRVRo8t47xVlyAzfmI1ceiQjOfEfwEmRLVbHqeWJvMGOmzWdTU3l5xKDkd_VcDOl8l5AkZoWgpFC-lvFi_duKlXk7LbhfCVt0PoO5lDbKcSSXhO62LeP3FGN2WqNBCUwy_JKPREaesIm8IoGaEIWA64VzdYST6VPTD7zf8mrc6TZfBBiYYvLTZfi7kMJURiqwU7Fpz_flrUZtuCviyMQEkfFnlyqPzTVRovkIPSeBM0JVpsvffo5vFihqMwpnTedEK56BxSy6BJYBszk_FViAW9J2UByPNGYag4BkCoLqOLb2ZH-Y076bPei9c-hu0BftOU_dKw7QNz2K4h41k-jB3s7_1RGn9ZdetJvFyWmO2WtwUph7yYWk0ErcWLlrI6N_OrI2Y4LLklVKolFl5XDXqk1lDJrRSMPIbSc-pDaaB0RnHmzafktog6iQq5sl2If8Dit1_HFNPlpyfO5pxlZqQdCZckTPj40gLQuqcdD5KOJ4VJMNegEcgqbmh-qvxZ1luXR0_ytFmwHMNzoJnzN1xLRXwquoIZST0gThYEMEiZvnW_LX_ZnTUoKVDTR8d2eVYw9CbBhW-f0VHjdrVdDuYDfq_PE4idr3xBRF942s9wGYx7dSgzUzfxAGWGbrlRFzvnQej7SuBtiUHTLd2j9D_Rdxv6Inb8vEZRAEwxofBddVYG3hDXv0gGIhRpQ2isFeGWA1oNWS4MZAmU685cfMnEczs_3PYTyYlcASBQBpqr0PgMldo7ZklODJK7mhr9qkM1IvEA1DyuRIqNk4PKsYyhrZnuUbaQvRWzQ-wYV7wB0VdbAKs7iJV943i0UQa_moD4jJJ0Q2QqlEOjyoHwFiOFi-ZDndnhURl0WK8av7iQgK2jX79xDtZrdoi_NDed1ngNzqcW-Pu-4LYuxswJy9VXzRNNmvVWsdlsmGBNwZ_EhZxUJwu_n95jJnSbLXEwBJDSDeMkIN-59eI6yHs2mtZruKBpGgsK2F7rhWz_VJatAIYl0EPrHWF7H7zVuP2Mh2gq6cqNnPxPV5CkJctfQaR-0WAV-0No6g1n2WAJzYEZt4g77HWPSklNuTpb5ALr8RJ2uxeEy7VL5NB3_TGjanYaev_HESmPhiw87ezR-eHV7LfsYzQxrghr6koFMui2P3L5sTvJWajE4Jj2UFTuDh9ws2Oa4_D595zeLURw6m00)
+![Modelo Relacional](diagrams/modelo_er.png)
 
 ### 7.1 Tablas y campos
 
@@ -334,6 +317,24 @@ La arquitectura de tres capas es adecuada para ATELIER porque:
 | id_pedido | INT | **FK → pedido** | Pedido al que pertenece |
 | id_variante | INT | **FK → variante_producto** | Variante vendida |
 
+**carrito_compra**
+
+| Campo | Tipo | Clave | Descripción |
+|---|---|---|---|
+| id_carrito | SERIAL | **PK** | Identificador del carrito |
+| fecha_creacion | TIMESTAMP | | Fecha de creación del carrito |
+| activo | BOOLEAN | | Indica si el carrito está vigente |
+| id_usuario | INT | **FK → usuario** | Usuario propietario del carrito |
+
+**item_carrito**
+
+| Campo | Tipo | Clave | Descripción |
+|---|---|---|---|
+| id_item | SERIAL | **PK** | Identificador del ítem |
+| cantidad | INT | | Cantidad de la variante en el carrito |
+| id_carrito | INT | **FK → carrito_compra** | Carrito al que pertenece |
+| id_variante | INT | **FK → variante_producto** | Variante agregada al carrito |
+
 **movimiento_inventario**
 
 | Campo | Tipo | Clave | Descripción |
@@ -387,6 +388,9 @@ La arquitectura de tres capas es adecuada para ATELIER porque:
 | color — variante_producto | 1 : N | Un color aplica a muchas variantes. |
 | usuario — pedido | 1 : N | Un usuario realiza muchos pedidos; cada pedido es de un usuario. |
 | pedido — detalle_pedido | 1 : N | Un pedido tiene uno o más detalles. |
+| usuario — carrito_compra | 1 : N | Un usuario puede tener varios carritos a lo largo del tiempo; cada carrito pertenece a un usuario. |
+| carrito_compra — item_carrito | 1 : N | Un carrito contiene uno o más ítems; cada ítem pertenece a un carrito. |
+| variante_producto — item_carrito | 1 : N | Una variante puede aparecer en los ítems de muchos carritos. |
 | variante_producto — detalle_pedido | 1 : N | Una variante puede aparecer en muchos detalles de pedido. |
 | variante_producto — movimiento_inventario | 1 : N | Una variante acumula muchos movimientos de inventario. |
 | usuario — movimiento_inventario | 1 : N | Un usuario registra muchos movimientos (trazabilidad). |
@@ -406,7 +410,7 @@ La coherencia entre los elementos de la documentación se demuestra en la siguie
 |---|---|---|---|---|
 | OE-1 Catálogo | Gestión y consulta del catálogo | CU-02 Gestionar productos | Producto, Categoria, Talla, Color, VarianteProducto | producto, categoria, talla, color, variante_producto |
 | OE-2 Inventario | Control de entradas, salidas y stock mínimo | CU-03 Controlar inventario | VarianteProducto, MovimientoInventario, Producto | variante_producto, movimiento_inventario, producto |
-| OE-3 Ventas | Carrito, pedido e historial | CU-01 Realizar compra | Usuario, CarritoCompra, ItemCarrito, Pedido, DetallePedido, VarianteProducto | usuario, pedido, detalle_pedido, variante_producto |
+| OE-3 Ventas | Carrito, pedido e historial | CU-01 Realizar compra | Usuario, CarritoCompra, ItemCarrito, Pedido, DetallePedido, VarianteProducto | usuario, carrito_compra, item_carrito, pedido, detalle_pedido, variante_producto |
 | OE-4 Compras | Compras a proveedores y recepción | CU-04 Gestionar compras a proveedores | Proveedor, Compra, DetalleCompra, VarianteProducto | proveedor, compra, detalle_compra, variante_producto |
 | OE-5 Reportes | Tableros gerenciales | CU-05 Visualizar reportes gerenciales | (lectura vía Power BI sobre el modelo de datos) | usuario, pedido, detalle_pedido, variante_producto, movimiento_inventario, compra |
 | Transversal | Autenticación y control de acceso | Autenticarse («include») | Usuario, Cliente, Vendedor, Administrador | usuario |
@@ -417,8 +421,8 @@ La coherencia entre los elementos de la documentación se demuestra en la siguie
 
 ## 9. Conclusiones
 
-1. La documentación de análisis y diseño permitió transformar la idea inicial de ATELIER en una propuesta estructurada: se definieron el objetivo central, cinco objetivos específicos, la arquitectura de tres capas con MVC, cinco casos de uso principales, un modelo de clases de 17 clases y un modelo relacional de 12 tablas.
-2. La arquitectura de tres capas resulta coherente con la naturaleza transaccional del sistema, pues concentra las reglas de negocio críticas (validación de stock, estados de pedido, alertas de inventario) en una única capa, garantizando la consistencia de la información.
+1. La documentación de análisis y diseño permitió transformar la idea inicial de ATELIER en una propuesta estructurada: se definieron el objetivo central, cinco objetivos específicos, la arquitectura de tres capas con MVC, cinco casos de uso principales, un modelo de clases de 17 clases y un modelo relacional de 14 tablas.
+2. La arquitectura de tres capas resulta coherente con la naturaleza transaccional del sistema, pues concentra las reglas de negocio críticas (validación de stock, estados de pedido, alertas de inventario) en una única capa, lo que facilita la gestión de la consistencia de la información; su garantía definitiva dependerá de la correcta implementación de transacciones, restricciones y control de concurrencia en la fase de desarrollo.
 3. La trazabilidad establecida entre problemática, objetivos, funcionalidades, casos de uso, clases y modelo relacional demuestra que los modelos no son independientes, sino vistas complementarias de la misma solución.
 4. En las siguientes etapas del proyecto deberán desarrollarse: el diseño detallado de la interfaz de usuario, la implementación de la base de datos, el backend de la API REST, la integración con Power BI y el plan de pruebas del sistema.
 
