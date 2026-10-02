@@ -29,24 +29,31 @@ jobs:
           path: ./
           extra_args: --only-verified
 
-  # 2. SCA — requiere SNYK_TOKEN en Settings → Secrets → Actions
+  # 2. SCA — auditoría de dependencias npm (bloquea en severidad alta)
   dependency-scan:
     name: Software Composition Analysis (SCA)
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Run Snyk (Node)
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
-          args: --severity-threshold=high
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Audit — bloquea si hay vulnerabilidades altas
+        run: npm audit --audit-level=high
 
   # 3. SAST con CodeQL (único job que publica en Security)
   sast-scan:
