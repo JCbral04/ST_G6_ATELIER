@@ -1,0 +1,93 @@
+name: DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Mínimo privilegio: todo denegado por defecto; cada job declara lo suyo
+permissions: {}
+
+jobs:
+  # 1. Escaneo de secretos en todo el historial
+  secret-detection:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run Trufflehog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --only-verified
+
+  # 2. SCA — requiere SNYK_TOKEN en Settings → Secrets → Actions
+  dependency-scan:
+    name: Software Composition Analysis (SCA)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run Snyk (Node)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  # 3. SAST con CodeQL (único job que publica en Security)
+  sast-scan:
+    name: Static Application Security Testing (SAST)
+    runs-on: ubuntu-latest
+    needs: [secret-detection, dependency-scan]
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Ejecutar análisis CodeQL
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  # 4. Despliegue solo si todas las compuertas de seguridad pasan
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: sast-scan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+    environment: production
+    steps:
+      - name: Despliegue seguro (placeholder)
+        run: |
+          echo "Todos los controles de seguridad pasaron con éxito."
+          echo "Desplegando la aplicación en el entorno seguro..."
