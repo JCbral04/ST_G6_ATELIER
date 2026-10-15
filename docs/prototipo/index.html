@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATELIER — ERP para Tienda de Ropa</title>
+<style>
+  :root{
+    --bg:#F7F3E8; --surface:#FFFDF7; --ink:#27231F; --muted:#8A8073;
+    --line:#D9D2C4; --accent:#9C4A2F; --accent-soft:#E9DCD2;
+    --ok:#5F7455; --warn:#B4552D; --danger:#8C3B36;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg);color:var(--ink);font-size:14px}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+  .view{display:none}
+  .view.active{display:block}
+
+  /* ---------- LOGIN ---------- */
+  #login{display:none;height:100vh}
+  #login.active{display:grid;grid-template-columns:1.1fr 1fr}
+  .login-brand{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;
+               justify-content:center;padding:0 9%}
+  .login-brand h1{font-size:64px;letter-spacing:8px;font-weight:400}
+  .login-brand .rule{width:64px;height:3px;background:var(--accent);margin:26px 0}
+  .login-brand p{color:#B9B0A0;font-size:15px;line-height:1.7;max-width:380px}
+  .login-form{display:flex;flex-direction:column;justify-content:center;padding:0 14%}
+  .login-form h2{font-size:22px;margin-bottom:6px}
+  .login-form .sub{color:var(--muted);margin-bottom:34px;font-size:13px}
+  label{display:block;font-size:11px;letter-spacing:1.5px;color:var(--muted);margin:18px 0 6px}
+  input,select{width:100%;padding:11px 12px;border:1px solid var(--line);background:var(--surface);
+               color:var(--ink);font-size:14px;border-radius:3px;outline:none}
+  input:focus,select:focus{border-color:var(--accent)}
+  .btn{display:inline-block;border:none;cursor:pointer;background:var(--ink);color:var(--bg);
+       padding:12px 28px;font-size:13px;letter-spacing:1px;border-radius:999px;transition:.15s}
+  .btn:hover{background:var(--accent)}
+  .btn-accent{background:var(--accent)}
+  .btn-accent:hover{background:var(--ink)}
+  .btn-block{width:100%;margin-top:30px;padding:14px}
+  .login-hint{margin-top:22px;font-size:12px;color:var(--muted);line-height:1.6}
+
+  /* ---------- SHELL ---------- */
+  #app{display:none;height:100vh;grid-template-columns:215px 1fr;grid-template-rows:1fr}
+  #app.active{display:grid}
+  aside{background:var(--ink);color:#CFC7B8;display:flex;flex-direction:column;padding:28px 0 20px}
+  aside .logo{color:var(--bg);font-size:24px;letter-spacing:5px;padding:0 26px 8px}
+  aside .logo-sub{font-size:10px;letter-spacing:2px;color:var(--muted);padding:0 26px 26px;
+                  border-bottom:1px solid #3A352E}
+  nav{flex:1;padding-top:14px}
+  nav a{display:flex;align-items:center;gap:12px;padding:12px 26px;color:#CFC7B8;
+        text-decoration:none;font-size:13.5px;border-left:3px solid transparent;cursor:pointer}
+  nav a:hover{background:#322D26;color:var(--bg)}
+  nav a.on{border-left-color:var(--accent);background:#322D26;color:var(--bg)}
+  nav a svg{width:16px;height:16px;flex:none}
+  .user-box{padding:16px 26px;border-top:1px solid #3A352E;font-size:12px;line-height:1.5}
+  .user-box b{color:var(--bg)}
+  main{overflow-y:auto;padding:30px 38px 50px}
+  .topbar{display:flex;justify-content:space-between;align-items:baseline;
+          border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:26px}
+  .topbar h2{font-size:24px;font-weight:600}
+  .topbar .meta{font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;padding:3px 12px;border-radius:999px;font-size:11.5px;border:1px solid var(--line)}
+  .pill-ok{color:var(--ok);border-color:var(--ok)}
+  .pill-warn{color:var(--warn);border-color:var(--warn);background:#F6E9E1}
+  .pill-muted{color:var(--muted)}
+
+  /* KPI row: dividers, not cards */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:34px}
+  .kpis>div{padding:6px 26px 14px;border-left:1px solid var(--line)}
+  .kpis>div:first-child{border-left:none;padding-left:0}
+  .kpis .k{font-size:11px;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+  .kpis .v{font-size:30px;font-weight:600}
+  .kpis .v span{font-size:14px;color:var(--muted);font-weight:400}
+  .kpis .alert{color:var(--accent)}
+
+  .cols-2{display:grid;grid-template-columns:1.5fr 1fr;gap:38px}
+  h3.sec{font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:14px;font-weight:600}
+
+  table{width:100%;border-collapse:collapse;background:var(--surface)}
+  th{font-size:11px;letter-spacing:1px;color:var(--muted);text-align:left;
+     padding:10px 14px;border-bottom:2px solid var(--ink);font-weight:600}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+  tr.low td{border-left:3px solid var(--accent);background:#FBF3EE}
+  td.num,th.num{text-align:right}
+  .stockbar{height:5px;background:var(--accent-soft);border-radius:3px;width:90px;position:relative}
+  .stockbar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:3px}
+
+  .alert-item{border-left:3px solid var(--accent);background:var(--surface);
+              padding:13px 16px;margin-bottom:12px;font-size:13px;line-height:1.5}
+  .alert-item b{color:var(--accent)}
+
+  /* POS */
+  .pos{display:grid;grid-template-columns:1.4fr 1fr;gap:38px;align-items:start}
+  .prod-row{display:flex;justify-content:space-between;align-items:center;gap:14px;
+            padding:13px 4px;border-bottom:1px solid var(--line)}
+  .prod-row .nm{font-weight:600}
+  .prod-row .vr{font-size:12px;color:var(--muted);margin-top:3px}
+  .prod-row .pr{font-weight:600;white-space:nowrap}
+  .btn-mini{border:1px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;
+            padding:6px 16px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .btn-mini:hover{background:var(--ink);color:var(--bg)}
+  .cart{border:1px solid var(--line);background:var(--surface);padding:22px 24px}
+  .cart h3{font-size:13px;letter-spacing:2px;color:var(--muted);margin-bottom:16px}
+  .cart-line{display:flex;justify-content:space-between;font-size:13px;padding:9px 0;
+             border-bottom:1px dashed var(--line)}
+  .cart-line .q{color:var(--muted)}
+  .cart-total{display:flex;justify-content:space-between;font-size:19px;font-weight:600;
+              padding:16px 0 4px}
+  .cart-empty{color:var(--muted);font-size:13px;padding:14px 0}
+  .search{margin-bottom:8px}
+
+  /* Catalog */
+  .prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+  .pcard{background:var(--surface);border:1px solid var(--line);padding:22px}
+  .pcard .cat{font-size:10.5px;letter-spacing:1.5px;color:var(--muted)}
+  .pcard h4{font-size:17px;margin:8px 0 4px}
+  .pcard .prc{color:var(--accent);font-weight:600;margin-bottom:14px}
+  .chip{display:inline-block;border:1px solid var(--line);border-radius:3px;padding:4px 9px;
+        font-size:11.5px;margin:0 6px 6px 0;color:var(--ink)}
+  .chip.low{border-color:var(--accent);color:var(--accent)}
+
+  /* Toast */
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--ink);color:var(--bg);
+         padding:15px 22px;border-radius:4px;font-size:13px;line-height:1.5;max-width:380px;
+         box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(12px);
+         transition:.25s;pointer-events:none;z-index:50}
+  #toast.show{opacity:1;transform:none}
+  #toast b{color:#E8B79B}
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="view active">
+  <div class="login-brand">
+    <h1 class="serif">ATELIER</h1>
+    <div class="rule"></div>
+    <p>Sistema de gestión para tienda de ropa.<br>Inventario, ventas y compras en un solo lugar.</p>
+  </div>
+  <div class="login-form">
+    <h2>Iniciar sesión</h2>
+    <div class="sub">Ingresa con tu cuenta de ATELIER</div>
+    <label>CORREO</label>
+    <input value="admin@atelier.com" readonly>
+    <label>CONTRASEÑA</label>
+    <input type="password" value="123456" readonly>
+    <button class="btn btn-block" onclick="go('dashboard')">Ingresar →</button>
+    <div class="login-hint">Prototipo de alta fidelidad — ATELIER · Grupo 6<br>Roles: administrador, vendedor, cliente</div>
+  </div>
+</section>
+
+<!-- ============ APP SHELL ============ -->
+<section id="app" class="view">
+  <aside>
+    <div class="logo serif">ATELIER</div>
+    <div class="logo-sub">PANEL DE GESTIÓN</div>
+    <nav id="nav">
+      <a data-v="dashboard" class="on">▦&nbsp; Dashboard</a>
+      <a data-v="pos">🛒&nbsp; Punto de venta</a>
+      <a data-v="inventario">▤&nbsp; Inventario</a>
+      <a data-v="catalogo">◈&nbsp; Catálogo</a>
+      <a data-v="compras">⇄&nbsp; Compras</a>
+    </nav>
+    <div class="user-box"><b>Admin ATELIER</b><br>administrador · sesión activa</div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <h2 id="view-title">Dashboard</h2>
+      <div class="meta">Bogotá · Auditoría S12 &nbsp;·&nbsp; <span id="bell">⚠ <b id="low-count">2</b> alertas de stock</span></div>
+    </div>
+    <div id="screen"></div>
+  </main>
+</section>
+
+<div id="toast"></div>
+
+<script>
+/* ---------- Estado (espejo de la BD del proyecto) ---------- */
+const state = {
+  variantes: [
+    {sku:'CAM-NEG-M', prod:'Camiseta básica algodón', talla:'M', color:'Negro', stock:68,  min:10, precio:45000},
+    {sku:'CAM-BLA-M', prod:'Camiseta básica algodón', talla:'M', color:'Blanco',stock:40,  min:10, precio:45000},
+    {sku:'CAM-ROJ-S', prod:'Camiseta básica algodón', talla:'S', color:'Rojo',  stock:8,   min:10, precio:45000},
+    {sku:'JEA-AZU-32',prod:'Jean clásico azul',       talla:'M', color:'Azul',  stock:30,  min:5,  precio:129900},
+    {sku:'JEA-NEG-30',prod:'Jean clásico azul',       talla:'S', color:'Negro', stock:3,   min:5,  precio:129900},
+    {sku:'CHA-AZU-L', prod:'Chaqueta denim',          talla:'L', color:'Azul',  stock:15,  min:3,  precio:199900},
+  ],
+  ventas: [
+    {id:1, cliente:'Cliente de prueba', items:'2 × CAM-NEG-M', total:90000,  estado:'confirmado', hora:'09:12'},
+    {id:2, cliente:'Cliente de prueba', items:'3 × CAM-NEG-M', total:135000, estado:'confirmado', hora:'10:05'},
+  ],
+  compras: [
+    {id:1, prov:'Textiles del Norte S.A.S.', detalle:'20 × CAM-NEG-M', total:700000, estado:'recibida'},
+    {id:2, prov:'Moda Premium Ltda.',        detalle:'10 × CAM-BLA-M', total:900000, estado:'pendiente'},
+  ],
+  cart: [],
+  nextVenta: 3,
+};
+const fmt = n => '$' + n.toLocaleString('es-CO');
+
+/* ---------- Navegación ---------- */
+const titles = {dashboard:'Dashboard', pos:'Punto de venta', inventario:'Inventario',
+                catalogo:'Catálogo', compras:'Compras y proveedores'};
+function go(view){
+  document.getElementById('login').classList.remove('active');
+  document.getElementById('app').classList.add('active');
+  show(view);
+}
+function show(view){
+  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on', a.dataset.v===view));
+  document.getElementById('view-title').textContent = titles[view];
+  document.getElementById('screen').innerHTML = views[view]();
+  document.getElementById('low-count').textContent = lowStock().length;
+  location.hash = '/' + view;
+}
+document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>show(a.dataset.v));
+
+const lowStock = () => state.variantes.filter(v=>v.stock < v.min);
+
+/* ---------- Vistas ---------- */
+const views = {
+  dashboard(){
+    const bajos = lowStock();
+    const totalHoy = state.ventas.reduce((s,v)=>s+v.total,0);
+    return `
+    <div class="kpis">
+      <div><div class="k">VENTAS DEL DÍA</div><div class="v">${fmt(totalHoy)}</div></div>
+      <div><div class="k">PEDIDOS CONFIRMADOS</div><div class="v">${state.ventas.length}</div></div>
+      <div><div class="k">STOCK BAJO</div><div class="v alert">${bajos.length} <span>variantes</span></div></div>
+      <div><div class="k">COMPRAS POR RECIBIR</div><div class="v">${state.compras.filter(c=>c.estado==='pendiente').length}</div></div>
+    </div>
+    <div class="cols-2">
+      <div>
+        <h3 class="sec">ÚLTIMAS VENTAS</h3>
+        <table>
+          <tr><th>#</th><th>Cliente</th><th>Detalle</th><th>Hora</th><th>Estado</th><th class="num">Total</th></tr>
+          ${state.ventas.slice().reverse().map(v=>`
+            <tr><td>${v.id}</td><td>${v.cliente}</td><td>${v.items}</td><td>${v.hora}</td>
+            <td><span class="pill pill-ok">${v.estado}</span></td><td class="num">${fmt(v.total)}</td></tr>`).join('')}
+        </table>
+      </div>
+      <div>
+        <h3 class="sec">ALERTAS DE STOCK MÍNIMO</h3>
+        ${bajos.map(v=>`<div class="alert-item"><b>${v.sku}</b> — ${v.prod} (${v.talla}/${v.color})<br>
+          Quedan <b>${v.stock}</b> uds. y el mínimo es ${v.min}. Se sugiere orden de compra.</div>`).join('')
+          || '<div class="alert-item" style="border-color:var(--ok)">Sin alertas. Todo el stock está sobre el mínimo.</div>'}
+      </div>
+    </div>`;
+  },
+
+  pos(){
+    return `
+    <div class="pos">
+      <div>
+        <input class="search" placeholder="Buscar producto o SKU…" oninput="filterPos(this.value)">
+        <div id="prod-list">
+        ${state.variantes.map((v,i)=>`
+          <div class="prod-row" data-name="${(v.prod+v.sku).toLowerCase()}">
+            <div><div class="nm">${v.prod}</div>
+                 <div class="vr">${v.sku} · Talla ${v.talla} · ${v.color} · <span id="st-${i}">${v.stock}</span> en stock</div></div>
+            <div style="display:flex;align-items:center;gap:16px">
+              <span class="pr">${fmt(v.precio)}</span>
+              <button class="btn-mini" onclick="addCart(${i})">+ Agregar</button>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="cart">
+        <h3>CARRITO DE COMPRA</h3>
+        <div id="cart-lines">${cartHtml()}</div>
+        <div class="cart-total"><span>Total</span><span id="cart-total">${fmt(cartTotal())}</span></div>
+        <button class="btn btn-accent btn-block" onclick="checkout()">Confirmar venta</button>
+      </div>
+    </div>`;
+  },
+
+  inventario(){
+    return `
+    <h3 class="sec">STOCK POR VARIANTE — ACTUALIZADO POR TRIGGERS EN CADA VENTA Y COMPRA</h3>
+    <table>
+      <tr><th>SKU</th><th>Producto</th><th>Talla</th><th>Color</th>
+          <th class="num">Stock</th><th class="num">Mínimo</th><th>Nivel</th><th>Estado</th></tr>
+      ${state.variantes.map(v=>{
+        const low = v.stock < v.min, pct = Math.min(100, v.stock/70*100);
+        return `<tr class="${low?'low':''}">
+          <td><b>${v.sku}</b></td><td>${v.prod}</td><td>${v.talla}</td><td>${v.color}</td>
+          <td class="num"><b>${v.stock}</b></td><td class="num">${v.min}</td>
+          <td><div class="stockbar"><i style="width:${pct}%"></i></div></td>
+          <td>${low?'<span class="pill pill-warn">Stock bajo</span>':'<span class="pill pill-ok">OK</span>'}</td>
+        </tr>`;}).join('')}
+    </table>`;
+  },
+
+  catalogo(){
+    const prods = {};
+    state.variantes.forEach(v=>{(prods[v.prod]=prods[v.prod]||{precio:v.precio,vars:[]}).vars.push(v)});
+    const cats = {'Camiseta básica algodón':'CAMISETAS','Jean clásico azul':'PANTALONES','Chaqueta denim':'CHAQUETAS'};
+    return `<div class="prod-grid">
+      ${Object.entries(prods).map(([name,p])=>`
+      <div class="pcard">
+        <div class="cat">${cats[name]}</div>
+        <h4>${name}</h4>
+        <div class="prc">${fmt(p.precio)}</div>
+        ${p.vars.map(v=>`<span class="chip ${v.stock<v.min?'low':''}">${v.sku} · ${v.stock} uds</span>`).join('')}
+      </div>`).join('')}
+    </div>`;
+  },
+
+  compras(){
+    return `
+    <h3 class="sec">ÓRDENES DE COMPRA A PROVEEDORES</h3>
+    <table>
+      <tr><th>#</th><th>Proveedor</th><th>Detalle</th><th class="num">Total</th><th>Estado</th><th></th></tr>
+      ${state.compras.map(c=>`
+        <tr><td>${c.id}</td><td>${c.prov}</td><td>${c.detalle}</td><td class="num">${fmt(c.total)}</td>
+        <td><span class="pill ${c.estado==='recibida'?'pill-ok':'pill-warn'}">${c.estado}</span></td>
+        <td class="num">${c.estado==='pendiente'
+            ? `<button class="btn-mini" onclick="recibir(${c.id})">Marcar recibida</button>`:''}</td></tr>`).join('')}
+    </table>`;
+  },
+};
+
+/* ---------- Lógica POS (simula los triggers de la BD) ---------- */
+function cartTotal(){return state.cart.reduce((s,l)=>s+l.precio*l.qty,0)}
+function cartHtml(){
+  if(!state.cart.length) return '<div class="cart-empty">El carrito está vacío. Agrega prendas desde la lista.</div>';
+  return state.cart.map((l,i)=>`
+    <div class="cart-line"><span>${l.prod} <span class="q">× ${l.qty}</span></span>
+    <span>${fmt(l.precio*l.qty)}</span></div>`).join('');
+}
+function addCart(i){
+  const v = state.variantes[i];
+  const line = state.cart.find(l=>l.sku===v.sku);
+  const inCart = line ? line.qty : 0;
+  if(inCart + 1 > v.stock){ toast(`<b>Venta rechazada:</b> ${v.sku} tiene ${v.stock} uds. en stock. La restricción CHECK (stock ≥ 0) bloquea la operación.`); return; }
+  line ? line.qty++ : state.cart.push({sku:v.sku, prod:v.prod, precio:v.precio, qty:1});
+  refreshCart();
+}
+function refreshCart(){
+  document.getElementById('cart-lines').innerHTML = cartHtml();
+  document.getElementById('cart-total').textContent = fmt(cartTotal());
+}
+function checkout(){
+  if(!state.cart.length){ toast('Agrega al menos una prenda al carrito.'); return; }
+  let items = [];
+  state.cart.forEach(l=>{
+    const v = state.variantes.find(x=>x.sku===l.sku);
+    v.stock -= l.qty;                       // ← trg_stock_venta en la BD real
+    items.push(`${l.qty} × ${l.sku}`);
+  });
+  const total = cartTotal();
+  state.ventas.push({id:state.nextVenta++, cliente:'Cliente de prueba',
+                     items:items.join(', '), total, estado:'confirmado',
+                     hora:new Date().toTimeString().slice(0,5)});
+  state.cart = [];
+  toast(`<b>Venta confirmada por ${fmt(total)}.</b><br>Trigger trg_stock_venta: stock actualizado automáticamente.`);
+  show('pos');
+}
+function recibir(id){
+  const c = state.compras.find(x=>x.id===id);
+  c.estado = 'recibida';
+  const [qty,,sku] = c.detalle.split(' ');
+  const v = state.variantes.find(x=>x.sku===sku);
+  if(v) v.stock += parseInt(qty);           // ← trg_stock_compra en la BD real
+  toast(`<b>Compra #${id} recibida.</b><br>Trigger trg_stock_compra: +${qty} uds. a ${sku}.`);
+  show('compras');
+}
+function filterPos(q){
+  q = q.toLowerCase();
+  document.querySelectorAll('.prod-row').forEach(r=>{
+    r.style.display = r.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+function toast(html){
+  const t = document.getElementById('toast');
+  t.innerHTML = html; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 3800);
+}
+
+/* ---------- Entrada por hash (para mostrar vistas directas) ---------- */
+window.addEventListener('load', ()=>{
+  const h = location.hash.replace('#/','');
+  if(titles[h]) go(h);
+});
+</script>
+</body>
+</html>
