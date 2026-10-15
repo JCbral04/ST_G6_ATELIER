@@ -43,7 +43,6 @@ Desarrollar un ERP que permita gestionar de manera eficiente e integrada los pro
 ST_G6_ATELIER/
 ├── docs/                  # Documentación de análisis y diseño (Fases 1-2)
 │   ├── analisis-y-diseno-ATELIER.md
-│   ├── ATELIER_Analisis_y_Diseno.pdf
 │   └── diagrams/
 ├── db/                    # Base de datos (Fase 3)
 │   ├── schema.sql         # Creación de BD, tablas, claves, restricciones y triggers
