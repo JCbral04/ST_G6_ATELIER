@@ -41,15 +41,24 @@ Desarrollar un ERP que permita gestionar de manera eficiente e integrada los pro
 
 ```
 ST_G6_ATELIER/
-├── docs/                  # Documentación de análisis y diseño (Fases 1-2)
+├── .github/               # DevSecOps: automatización y seguridad del repo
+│   ├── workflows/
+│   │   ├── ci.yml                 # CI: valida schema.sql + seed.sql con PostgreSQL 16
+│   │   └── devsecops-pipeline.yml # Secretos (Trufflehog) → SCA (npm audit) → SAST (CodeQL) → deploy
+│   ├── dependabot.yml     # Actualizaciones semanales de dependencias
+│   └── CODEOWNERS         # Revisión obligatoria antes de merge
+├── docs/                  # Documentación y prototipo (Fases 1-3)
 │   ├── analisis-y-diseno-ATELIER.md
-│   └── diagrams/
+│   ├── diagrams/          # Diagramas UML/ER (PNG + fuentes .puml)
+│   └── prototipo/
+│       └── index.html     # Prototipo navegable de alta fidelidad
 ├── db/                    # Base de datos (Fase 3)
 │   ├── schema.sql         # Creación de BD, tablas, claves, restricciones y triggers
 │   └── seed.sql           # Datos iniciales de prueba
 └── backend/               # API REST (Fase 3: estructura inicial)
     ├── server.js
     ├── package.json
+    ├── package-lock.json  # Requerido por npm audit en el pipeline
     ├── .env.example
     └── src/
         ├── config/db.js   # Conexión a PostgreSQL
