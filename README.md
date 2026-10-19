@@ -31,7 +31,7 @@ Desarrollar un ERP que permita gestionar de manera eficiente e integrada los pro
 
 ## Stack tecnológico
 
-- **Frontend:** React *(Fase 4)*
+- **Frontend:** HTML, CSS y JavaScript *(Fase 3)* → React *(Fase 4)*
 - **Backend:** Node.js + Express (API REST)
 - **Base de datos:** PostgreSQL 14+
 - **Analítica:** Microsoft Power BI
@@ -55,6 +55,9 @@ ST_G6_ATELIER/
 ├── db/                    # Base de datos (Fase 3)
 │   ├── schema.sql         # Creación de BD, tablas, claves, restricciones y triggers
 │   └── seed.sql           # Datos iniciales de prueba
+├── frontend/              # Interfaz web (Fase 3: pantallas principales)
+│   ├── index.html
+│   └── src/               # css/ y js/ (vistas, router, capa de datos)
 └── backend/               # API REST (Fase 3: estructura inicial)
     ├── server.js
     ├── package.json
@@ -83,7 +86,11 @@ cp .env.example .env        # completar DB_PASSWORD
 npm run dev
 ```
 
-### 3. Verificación
+### 3. Interfaz web
+
+Con el backend corriendo, abrir `http://localhost:3000/`. Sin backend, abrir `frontend/index.html` (modo demo con los datos del seed). Detalles en [`frontend/README.md`](frontend/README.md).
+
+### 4. Verificación
 
 - API: `http://localhost:3000/api/health` → `{ "api": "ATELIER operativa", "base_de_datos": true }`
 - El script SQL de verificación al final de `db/seed.sql` muestra los stocks actualizados automáticamente por los triggers.
