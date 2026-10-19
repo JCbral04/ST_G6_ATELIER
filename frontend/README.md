@@ -1,7 +1,8 @@
 # ATELIER — Interfaz web (Fase III)
 
 Pantallas principales del ERP, construidas a partir del prototipo de alta fidelidad
-(`docs/prototipo/index.html`). HTML + CSS + JavaScript sin dependencias ni build,
+(`docs/prototipo/index.html`) con la paleta del equipo: violeta `#9314EB` (marca, acciones y
+lo que hay que reponer), azul `#129AED` (información y estados OK), blanco y negro. HTML + CSS + JavaScript sin dependencias ni build,
 para que corra igual en cualquier equipo del grupo. La migración a React queda para la Fase 4.
 
 ## Pantallas
@@ -42,7 +43,7 @@ Usuarios de prueba (los del `db/seed.sql`), contraseña `123456`:
 
 `src/js/api.js` consulta cada recurso en la API; si el endpoint aún no existe usa los datos
 de `src/js/data.js` (espejo del seed). El indicador del encabezado muestra
-**Datos en vivo**, **API parcial (n/4)** o **Modo demo**.
+**Conectado a la base de datos**, **Conexión parcial (n de 4)** o **Datos de prueba**.
 
 | Recurso | Endpoint esperado | Estado |
 |---|---|---|
@@ -67,7 +68,8 @@ La alerta de stock se activa cuando `stock <= stock_minimo`.
 frontend/
 ├── index.html            # login + shell (navegación lateral, topbar)
 └── src/
-    ├── css/styles.css    # paleta del prototipo + reglas responsive
+    ├── css/styles.css    # paleta del equipo (#9314EB, #129AED, blanco, negro) + responsive
+    ├── fonts/            # Bricolage Grotesque y Hanken Grotesk (OFL), sin depender de internet
     └── js/
         ├── utils.js      # formato de moneda, escape HTML, toast, sesión
         ├── data.js       # datos de respaldo (modo demo)

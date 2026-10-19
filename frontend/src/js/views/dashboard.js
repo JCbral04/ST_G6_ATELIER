@@ -6,8 +6,8 @@
   const esc = A.esc, fmt = A.fmt;
 
   A.views.dashboard = {
-    title: 'Dashboard',
-    icon: '▦',
+    title: 'Inicio',
+    nav: 'Inicio',
     roles: ['administrador', 'vendedor'],
 
     render() {
@@ -23,34 +23,36 @@
 
       return `
       <div class="kpis">
-        <div><div class="k">VENTAS DEL DÍA</div><div class="v">${fmt(totalHoy)}</div></div>
-        <div><div class="k">PEDIDOS HOY</div><div class="v">${ventasHoy.length}</div></div>
-        <div><div class="k">STOCK BAJO</div><div class="v ${bajos.length ? 'alert' : ''}">${bajos.length} <span>variantes</span></div></div>
-        <div><div class="k">COMPRAS POR RECIBIR</div><div class="v">${porRecibir}</div></div>
+        <div><div class="k">Vendido hoy</div><div class="v">${fmt(totalHoy)}</div></div>
+        <div><div class="k">Pedidos de hoy</div><div class="v">${ventasHoy.length}</div></div>
+        <div><div class="k">Variantes por reponer</div><div class="v ${bajos.length ? 'alert' : ''}">${bajos.length}</div></div>
+        <div><div class="k">Compras por recibir</div><div class="v">${porRecibir}</div></div>
       </div>
       <div class="cols-2">
         <div>
-          <h3 class="sec">ÚLTIMAS VENTAS</h3>
+          <h3 class="sec">Últimas ventas</h3>
           ${ultimas.length ? `
           <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Cliente / usuario</th><th>Fecha</th><th>Estado</th><th class="num">Total</th></tr></thead>
+            <thead><tr><th>Pedido</th><th>Registrado por</th><th>Fecha</th><th>Estado</th><th class="num">Total</th></tr></thead>
             <tbody>
             ${ultimas.map(function (p) {
               return `<tr><td>${esc(p.id_pedido)}</td><td>${esc(p.usuario)}</td>
-                <td>${esc(A.fecha(p.fecha))} · ${esc(A.hora(p.fecha))}</td>
+                <td>${esc(A.fecha(p.fecha))}, ${esc(A.hora(p.fecha))}</td>
                 <td><span class="pill ${p.estado === 'cancelado' ? 'pill-warn' : 'pill-ok'}">${esc(p.estado)}</span></td>
                 <td class="num">${fmt(p.total)}</td></tr>`;
             }).join('')}
             </tbody>
-          </table></div>` : '<div class="empty">Aún no hay ventas registradas.</div>'}
+          </table></div>` : '<div class="empty">Todavía no hay ventas. Regístralas desde Punto de venta.</div>'}
         </div>
         <div>
-          <h3 class="sec">ALERTAS DE STOCK MÍNIMO</h3>
-          ${bajos.map(function (v) {
-            return `<div class="alert-item"><b>${esc(v.sku)}</b> — ${esc(v.producto)} (${esc(v.talla)} / ${esc(v.color)})<br>
-              Quedan <b>${esc(v.stock)}</b> uds. y el mínimo es ${esc(v.stock_minimo)}. Se sugiere orden de compra.</div>`;
-          }).join('') || '<div class="alert-item ok">Sin alertas. Todo el stock está sobre el mínimo.</div>'}
-          ${bajos.length && A.app.can('compras') ? '<a class="btn-mini" href="#/compras">Ver compras →</a>' : ''}
+          <h3 class="sec">Por reponer</h3>
+          ${bajos.length ? `<ul class="alert-list">${bajos.map(function (v) {
+            return `<li class="alert-item">
+              <div class="top"><span class="sku">${esc(v.sku)}</span><span class="left">${esc(v.stock)} de ${esc(v.stock_minimo)} mín.</span></div>
+              <div class="desc">${esc(v.producto)}, talla ${esc(v.talla)}, ${esc(String(v.color).toLowerCase())}</div>
+            </li>`;
+          }).join('')}</ul>` : '<div class="all-good">Todo el inventario está por encima del mínimo.</div>'}
+          ${bajos.length && A.app.can('compras') ? '<div class="after-list"><a class="btn-mini" href="#/compras">Ir a compras</a></div>' : ''}
         </div>
       </div>`;
     },

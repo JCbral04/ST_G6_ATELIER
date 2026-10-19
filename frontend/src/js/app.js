@@ -16,7 +16,7 @@
   function renderNav() {
     $('nav').innerHTML = allowed().map(function (k) {
       const v = A.views[k];
-      return `<a href="#/${k}" data-v="${k}"><span class="ico" aria-hidden="true">${v.icon}</span>${A.esc(v.title)}</a>`;
+      return `<a href="#/${k}" data-v="${k}">${A.esc(v.nav || v.title)}</a>`;
     }).join('');
   }
 
@@ -54,7 +54,7 @@
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     $('view-title').textContent = v.title;
-    document.title = v.title + ' · ATELIER';
+    document.title = v.title + ' – Atelier';
 
     // Contenedor nuevo en cada render: los listeners de la vista anterior se descartan
     const root = document.createElement('div');
@@ -77,7 +77,7 @@
     $('login').hidden = true;
     $('app').hidden = false;
     $('user-name').textContent = A.session.nombre;
-    $('user-role').textContent = A.session.rol + ' · sesión activa';
+    $('user-role').textContent = A.session.rol;
     renderNav();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
     await A.api.load();

@@ -11,33 +11,32 @@
   <!-- ============ LOGIN ============ -->
   <section id="login" class="login" hidden>
     <div class="login-brand">
-      <h1 class="serif">ATELIER</h1>
-      <div class="rule"></div>
-      <p>Sistema de gestión para tienda de ropa.<br>Inventario, ventas y compras en un solo lugar.</p>
+      <h1>atelier</h1>
+      <p>Inventario, ventas y compras de la tienda en un solo lugar.</p>
     </div>
     <form id="login-form" class="login-form" novalidate>
-      <h2>Iniciar sesión</h2>
-      <div class="sub">Ingresa con tu cuenta de ATELIER</div>
+      <h2>Inicia sesión</h2>
+      <div class="sub">Usa el correo y la contraseña de tu cuenta.</div>
 
       <div class="field">
-        <label for="correo">CORREO <span class="req" aria-hidden="true">*</span></label>
+        <label for="correo">Correo <span class="req" aria-hidden="true">*</span></label>
         <input id="correo" name="correo" type="email" autocomplete="username"
                placeholder="nombre@atelier.com" required aria-describedby="correo-error">
         <div class="field-error" id="correo-error" role="alert"></div>
       </div>
 
       <div class="field">
-        <label for="contrasena">CONTRASEÑA <span class="req" aria-hidden="true">*</span></label>
+        <label for="contrasena">Contraseña <span class="req" aria-hidden="true">*</span></label>
         <input id="contrasena" name="contrasena" type="password" autocomplete="current-password"
                placeholder="Mínimo 6 caracteres" required minlength="6" aria-describedby="contrasena-error">
         <div class="field-error" id="contrasena-error" role="alert"></div>
       </div>
 
       <div class="form-error" id="login-error" role="alert"></div>
-      <button type="submit" class="btn btn-block">Ingresar →</button>
+      <button type="submit" class="btn btn-block">Ingresar</button>
       <div class="login-hint">
-        Usuarios de prueba (seed): <b>admin@atelier.com</b>, <b>vendedor@atelier.com</b>,
-        <b>cliente@atelier.com</b> — contraseña <b>123456</b>
+        Para probar, entra con <b>admin@atelier.com</b>, <b>vendedor@atelier.com</b>
+        o <b>cliente@atelier.com</b> y la contraseña <b>123456</b>.
       </div>
     </form>
   </section>
@@ -45,17 +44,17 @@
   <!-- ============ APP SHELL ============ -->
   <section id="app" class="app" hidden>
     <header class="mobile-bar">
-      <button id="menu-btn" class="menu-btn" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">☰</button>
-      <span class="logo serif">ATELIER</span>
-      <span class="bell-mini" id="bell-mini" title="Alertas de stock">⚠ <b>0</b></span>
+      <button id="menu-btn" class="menu-btn" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">Menú</button>
+      <span class="logo">atelier</span>
+      <a href="#/inventario" class="bell-mini" id="bell-mini" title="Variantes por reponer"><b>0</b> por reponer</a>
     </header>
 
     <aside id="sidebar" class="sidebar">
-      <div class="logo serif">ATELIER</div>
-      <div class="logo-sub">PANEL DE GESTIÓN</div>
+      <div class="logo">atelier</div>
       <nav id="nav" aria-label="Navegación principal"></nav>
       <div class="user-box">
-        <b id="user-name">—</b><br><span id="user-role">—</span>
+        <b id="user-name">—</b>
+        <span class="role" id="user-role">—</span>
         <button id="logout-btn" class="link-btn" type="button">Cerrar sesión</button>
       </div>
     </aside>
@@ -63,10 +62,10 @@
 
     <main id="main">
       <div class="topbar">
-        <h2 id="view-title">Dashboard</h2>
+        <h2 id="view-title">Inicio</h2>
         <div class="meta">
           <span id="data-source" class="pill pill-muted">—</span>
-          <a href="#/inventario" id="bell" class="bell">⚠ <b id="low-count">0</b> alertas de stock</a>
+          <a href="#/inventario" id="bell" class="bell"><b id="low-count">0</b> variantes por reponer</a>
         </div>
       </div>
       <div id="screen" aria-live="polite"></div>

@@ -70,9 +70,9 @@
     sourceLabel() {
       const live = Object.keys(RESOURCES).filter(function (k) { return A.store.live[k]; }).length;
       const total = Object.keys(RESOURCES).length;
-      if (live === total) return { text: 'Datos en vivo', cls: 'pill-ok' };
-      if (live > 0) return { text: 'API parcial (' + live + '/' + total + ')', cls: 'pill-warn' };
-      return { text: 'Modo demo', cls: 'pill-muted' };
+      if (live === total) return { text: 'Conectado a la base de datos', cls: 'pill-ok' };
+      if (live > 0) return { text: 'Conexión parcial (' + live + ' de ' + total + ')', cls: 'pill-warn' };
+      return { text: 'Datos de prueba', cls: 'pill-muted' };
     },
 
     // POST /api/pedidos (PR #11). En modo demo simula el trigger trg_stock_venta.

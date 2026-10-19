@@ -43,22 +43,22 @@
   function resultsHtml() {
     const list = filtrar();
     if (!list.length) {
-      return '<div class="empty">Ningún producto coincide con los filtros. Prueba ampliando el rango de precio o limpiando los filtros.</div>';
+      return '<div class="empty">Ningún producto coincide con estos filtros. Amplía el rango de precio o limpia los filtros.</div>';
     }
     return `
-      <div class="result-count">${list.length} producto(s) encontrados</div>
+      <div class="result-count">${list.length === 1 ? '1 producto' : list.length + ' productos'}</div>
       <div class="prod-grid">
       ${list.map(function (p) {
         const disp = p.vars.reduce(function (t, v) { return t + v.stock; }, 0);
         return `<div class="pcard">
-          <div class="cat">${esc(String(p.categoria || '').toUpperCase())}</div>
+          <div class="cat">${esc(p.categoria)}</div>
           <h4>${esc(p.nombre)}</h4>
           <div class="prc">${fmt(p.precio)}</div>
-          ${p.vars.map(function (v) {
+          <div class="chips">${p.vars.map(function (v) {
             return `<span class="chip ${A.isLow(v) ? 'low' : ''}" title="${esc(v.sku)}">
-              <span class="swatch" style="background:${esc(v.codigo_hex || '#ccc')}"></span>${esc(v.talla)} · ${esc(v.stock)} uds</span>`;
-          }).join('')}
-          <div class="result-count" style="margin:8px 0 0">${disp} uds. disponibles</div>
+              <span class="swatch" style="background:${esc(v.codigo_hex || '#ccc')}"></span>${esc(v.talla)}: ${esc(v.stock)}</span>`;
+          }).join('')}</div>
+          <div class="stock-total">${disp} unidades disponibles</div>
         </div>`;
       }).join('')}
       </div>`;
@@ -66,8 +66,7 @@
 
   A.views.catalogo = {
     title: 'Catálogo',
-    icon: '◈',
-    roles: ['administrador', 'vendedor', 'cliente'],
+        roles: ['administrador', 'vendedor', 'cliente'],
 
     render() {
       const vs = A.store.variantes;
@@ -77,19 +76,19 @@
 
       return `
       <form class="filters" id="cat-filters" role="search">
-        <div class="f-search"><label for="f-q">BUSCAR</label>
-          <input id="f-q" name="q" placeholder="Nombre o SKU…" value="${esc(f.q)}"></div>
-        <div><label for="f-categoria">CATEGORÍA</label>
+        <div class="f-search"><label for="f-q">Buscar</label>
+          <input id="f-q" name="q" placeholder="Nombre o SKU" value="${esc(f.q)}"></div>
+        <div><label for="f-categoria">Categoría</label>
           <select id="f-categoria" name="categoria">${options(uniq(vs.map(function (v) { return v.categoria; })).sort(), f.categoria, 'Todas')}</select></div>
-        <div><label for="f-talla">TALLA</label>
+        <div><label for="f-talla">Talla</label>
           <select id="f-talla" name="talla">${options(tallas, f.talla, 'Todas')}</select></div>
-        <div><label for="f-color">COLOR</label>
+        <div><label for="f-color">Color</label>
           <select id="f-color" name="color">${options(uniq(vs.map(function (v) { return v.color; })).sort(), f.color, 'Todos')}</select></div>
-        <div><label for="f-min">PRECIO MÍN.</label>
+        <div><label for="f-min">Precio mínimo</label>
           <input id="f-min" name="min" type="number" min="0" step="1000" inputmode="numeric" placeholder="$0" value="${esc(f.min)}"></div>
-        <div><label for="f-max">PRECIO MÁX.</label>
+        <div><label for="f-max">Precio máximo</label>
           <input id="f-max" name="max" type="number" min="0" step="1000" inputmode="numeric" placeholder="Sin límite" value="${esc(f.max)}"></div>
-        <div><button type="button" class="btn-mini" id="f-clear">Limpiar</button></div>
+        <div><button type="button" class="btn-mini" id="f-clear">Limpiar filtros</button></div>
       </form>
       <div id="cat-results">${resultsHtml()}</div>`;
     },

@@ -9,7 +9,7 @@
 
   A.views.compras = {
     title: 'Compras y proveedores',
-    icon: '⇄',
+    nav: 'Compras',
     roles: ['administrador'],
 
     render() {
@@ -20,19 +20,18 @@
 
       return `
       <div class="kpis">
-        <div><div class="k">ÓRDENES</div><div class="v">${compras.length}</div></div>
-        <div><div class="k">POR RECIBIR</div><div class="v">${pendientes.length}</div></div>
-        <div><div class="k">VALOR POR RECIBIR</div><div class="v">${fmt(pendientes.reduce(function (t, c) { return t + c.total; }, 0))}</div></div>
-        <div><div class="k">PROVEEDORES</div><div class="v">${s.proveedores.length}</div></div>
+        <div><div class="k">Órdenes</div><div class="v">${compras.length}</div></div>
+        <div><div class="k">Por recibir</div><div class="v">${pendientes.length}</div></div>
+        <div><div class="k">Valor por recibir</div><div class="v">${fmt(pendientes.reduce(function (t, c) { return t + c.total; }, 0))}</div></div>
+        <div><div class="k">Proveedores</div><div class="v">${s.proveedores.length}</div></div>
       </div>
 
-      ${bajos.length ? `<div class="alert-item">Hay <b>${bajos.length}</b> variante(s) en stock mínimo:
-        ${bajos.map(function (v) { return '<b>' + esc(v.sku) + '</b>'; }).join(', ')}. Considera generar una orden de compra.</div>` : ''}
+      ${bajos.length ? `<p class="sec-note" style="margin:0 0 24px">Por reponer: ${bajos.map(function (v) { return '<span class="sku" style="color:var(--violet)">' + esc(v.sku) + '</span>'; }).join(', ')}.</p>` : ''}
 
-      <h3 class="sec">ÓRDENES DE COMPRA A PROVEEDORES</h3>
+      <h3 class="sec">Órdenes de compra</h3>
       ${compras.length ? `
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Fecha</th><th>Proveedor</th><th>Detalle</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Orden</th><th>Fecha</th><th>Proveedor</th><th>Detalle</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead>
         <tbody>
         ${compras.map(function (c) {
           const det = (c.items || []).map(function (i) { return esc(i.cantidad) + ' × ' + esc(i.sku); }).join(', ') || '—';
@@ -40,17 +39,17 @@
             <td>${det}</td><td class="num">${fmt(c.total)}</td>
             <td><span class="pill ${PILL[c.estado] || 'pill-muted'}">${esc(c.estado)}</span></td>
             <td class="num">${c.estado === 'pendiente'
-              ? `<button class="btn-mini" data-recibir="${esc(c.id_compra)}">Marcar recibida</button>` : ''}</td></tr>`;
+              ? `<button class="btn-mini" data-recibir="${esc(c.id_compra)}">Recibir</button>` : ''}</td></tr>`;
         }).join('')}
         </tbody>
       </table></div>` : '<div class="empty">No hay órdenes de compra registradas.</div>'}
 
-      <h3 class="sec sec-gap">PROVEEDORES</h3>
+      <h3 class="sec sec-gap">Proveedores</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>Proveedor</th><th>Contacto</th><th>Correo</th><th>Teléfono</th></tr></thead>
         <tbody>
         ${s.proveedores.map(function (p) {
-          return `<tr><td><b>${esc(p.nombre)}</b></td><td>${esc(p.contacto || '—')}</td>
+          return `<tr><td class="sku">${esc(p.nombre)}</td><td>${esc(p.contacto || '—')}</td>
             <td>${esc(p.correo || '—')}</td><td>${esc(p.telefono || '—')}</td></tr>`;
         }).join('')}
         </tbody>
@@ -65,11 +64,11 @@
         btn.disabled = true;
         try {
           await A.api.recibirCompra(id);
-          A.toast('<b>Compra #' + esc(id) + ' recibida.</b><br>Trigger trg_stock_compra: stock actualizado.');
+          A.toast('<b>Orden ' + esc(id) + ' recibida.</b> El stock ya se sumó al inventario.');
           A.app.refresh();
         } catch (err) {
           btn.disabled = false;
-          A.toast('<b>Error:</b> ' + esc(err.message));
+          A.toast('<b>No se pudo recibir la orden.</b> ' + esc(err.message));
         }
       });
     },

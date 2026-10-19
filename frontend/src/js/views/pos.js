@@ -28,48 +28,47 @@
       const libre = v.stock - enCarrito(v.id_variante);
       return `<div class="prod-row">
         <div><div class="nm">${esc(v.producto)}</div>
-          <div class="vr">${esc(v.sku)} · Talla ${esc(v.talla)} · ${esc(v.color)} ·
-            <span class="${A.isLow(v) ? 'pill pill-warn' : ''}">${esc(v.stock)} en stock</span></div></div>
+          <div class="vr">${esc(v.sku)}, talla ${esc(v.talla)}, ${esc(String(v.color).toLowerCase())}.
+            <span class="${A.isLow(v) ? 'low' : ''}">${esc(v.stock)} disponibles</span></div></div>
         <div class="act">
           <span class="pr">${fmt(v.precio)}</span>
           <button class="btn-mini" data-add="${esc(v.id_variante)}" ${libre <= 0 ? 'disabled' : ''}>
-            ${v.stock <= 0 ? 'Agotado' : '+ Agregar'}</button>
+            ${v.stock <= 0 ? 'Agotado' : 'Agregar'}</button>
         </div>
       </div>`;
     }).join('');
   }
 
   function cartHtml() {
-    if (!cart().length) return '<div class="cart-empty">El carrito está vacío. Agrega prendas desde la lista.</div>';
+    if (!cart().length) return '<div class="cart-empty">Agrega prendas desde la lista para empezar una venta.</div>';
     return cart().map(function (l) {
       const v = variante(l.id_variante);
       return `<div class="cart-line">
-        <span>${esc(v.producto)}<br><small style="color:var(--muted)">${esc(v.sku)}</small></span>
-        <span class="q">
+        <div>${esc(v.producto)}<div class="sub">${esc(v.sku)} a ${fmt(v.precio)}</div></div>
+        <div class="price">${fmt(v.precio * l.cantidad)}</div>
+        <div class="q">
           <button class="qty-btn" data-dec="${esc(v.id_variante)}" aria-label="Quitar una unidad">−</button>
           <b>${esc(l.cantidad)}</b>
           <button class="qty-btn" data-inc="${esc(v.id_variante)}" aria-label="Agregar una unidad">+</button>
-          <button class="qty-btn" data-del="${esc(v.id_variante)}" aria-label="Eliminar del carrito">×</button>
-        </span>
-        <span>${fmt(v.precio * l.cantidad)}</span>
+        </div>
+        <div class="price"><button class="qty-btn del" data-del="${esc(v.id_variante)}">Quitar</button></div>
       </div>`;
     }).join('');
   }
 
   A.views.pos = {
     title: 'Punto de venta',
-    icon: '🛒',
-    roles: ['administrador', 'vendedor'],
+        roles: ['administrador', 'vendedor'],
 
     render() {
       return `
       <div class="pos">
         <div>
-          <input class="search" id="pos-search" type="search" placeholder="Buscar producto o SKU…" value="${esc(query)}" aria-label="Buscar producto">
+          <input class="search" id="pos-search" type="search" placeholder="Busca por nombre o SKU" value="${esc(query)}" aria-label="Buscar producto">
           <div id="prod-list">${listHtml()}</div>
         </div>
         <div class="cart">
-          <h3>CARRITO DE COMPRA</h3>
+          <h3>Venta actual</h3>
           <div id="cart-lines">${cartHtml()}</div>
           <div class="cart-total"><span>Total</span><span id="cart-total">${fmt(total())}</span></div>
           <button class="btn btn-accent btn-block" id="checkout" ${cart().length ? '' : 'disabled'}>Confirmar venta</button>
@@ -100,7 +99,7 @@
         if (t.dataset.add || t.dataset.inc) {
           const v = variante(id);
           if (enCarrito(id) + 1 > v.stock) {   // RN-01: no vender más del stock
-            A.toast('<b>Stock insuficiente:</b> ' + esc(v.sku) + ' tiene ' + esc(v.stock) + ' uds.');
+            A.toast('<b>No hay más unidades.</b> ' + esc(v.sku) + ' tiene ' + esc(v.stock) + ' disponibles.');
             return;
           }
           line ? line.cantidad++ : items.push({ id_variante: id, cantidad: 1 });
@@ -117,11 +116,11 @@
           try {
             const r = await A.api.registrarVenta(A.session.id_usuario, items);
             A.store.cart = [];
-            A.toast('<b>Venta #' + esc(r.id_pedido) + ' registrada por ' + fmt(r.total) + '.</b><br>Stock descontado (trg_stock_venta).');
+            A.toast('<b>Venta confirmada.</b> Pedido ' + esc(r.id_pedido) + ' por ' + fmt(r.total) + '. El stock ya se descontó.');
             A.app.refresh();
           } catch (err) {
             t.disabled = false;
-            A.toast('<b>Venta rechazada:</b> ' + esc(err.message) + '. El inventario no se modificó.');
+            A.toast('<b>No se confirmó la venta.</b> ' + esc(err.message) + '. El inventario no cambió.');
           }
         }
       });
