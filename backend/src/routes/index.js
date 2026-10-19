@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { pool } = require('../config/db');
+const gestionRoutes = require('./gestion.routes');
 
 const router = Router();
 
@@ -13,11 +14,7 @@ router.get('/health', async (req, res) => {
   }
 });
 
-// Módulos pendientes para Fase 4 (operaciones CRUD):
-// router.use('/auth', require('./auth.routes'));          // RF-01..03 autenticación
-// router.use('/productos', require('./producto.routes')); // RF-04..08 catálogo
-// router.use('/pedidos', require('./pedido.routes'));     // RF-09..12 ventas
-// router.use('/inventario', require('./inventario.routes')); // RF-13..15 inventario
-// router.use('/compras', require('./compra.routes'));     // RF-16..18 compras/proveedores
+// Rutas de gestión de información (RF-06, RF-09, RF-10)
+router.use('/', gestionRoutes);
 
 module.exports = router;
