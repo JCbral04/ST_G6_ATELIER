@@ -54,8 +54,8 @@
 
     // Forma esperada de GET /api/proveedores
     proveedores: [
-      { id_proveedor: 1, nombre: 'Textiles del Norte S.A.S.', contacto: 'Carlos Ríos', correo: 'ventas@textilesnorte.co', telefono: '6017458890' },
-      { id_proveedor: 2, nombre: 'Moda Premium Ltda.', contacto: 'Andrea Salazar', correo: 'comercial@modapremium.co', telefono: '6013126677' },
+      { id_proveedor: 1, nombre: 'Textiles del Norte S.A.S.', contacto: 'Carlos Ríos', correo: 'ventas@textilesnorte.co', telefono: '311 745 8890' },
+      { id_proveedor: 2, nombre: 'Moda Premium Ltda.', contacto: 'Andrea Salazar', correo: 'comercial@modapremium.co', telefono: '322 312 6677' },
     ],
   };
 })(window.Atelier);
