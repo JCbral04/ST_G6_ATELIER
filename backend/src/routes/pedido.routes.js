@@ -1,7 +1,20 @@
 const { Router } = require('express');
 const { pool } = require('../config/db');
+const rateLimit = require('express-rate-limit');
 
 const router = Router();
+
+// Límite de peticiones por IP (seguridad: mitigación de abuso/DoS) resueltos comentarios de codeQL y dependabot sobre las fallas
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // ventana de 15 minutos
+  max: 100,                  // máximo 100 peticiones por IP por ventana
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones, intenta más tarde' },
+});
+
+router.use(limiter);
+
 
 //En caso de que tengamos X o Y problema de seguridad o vulnerabilidad en el codigo codeQL nos lo dira :))
 
