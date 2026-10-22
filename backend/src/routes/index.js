@@ -4,13 +4,16 @@ const gestionRoutes = require('./gestion.routes');
 
 const router = Router();
 
-// Health check (verificación de que API + BD responden)
+// Endpoint de estado
 router.get('/health', async (req, res) => {
   try {
-    const db = await pool.query('SELECT 1 AS ok');
-    res.json({ api: 'ATELIER operativa', base_de_datos: db.rows[0].ok === 1 });
-  } catch (err) {
-    res.status(500).json({ api: 'ATELIER operativa', base_de_datos: false });
+    const result = await pool.query('SELECT NOW()');
+    res.json({
+      status: 'ok',
+      timestamp: result.rows[0].now
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
