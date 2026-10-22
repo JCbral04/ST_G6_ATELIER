@@ -20,7 +20,7 @@ jobs:
         working-directory: backend
     steps:
       - name: Clonar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false   # no dejar el token en .git/config
 
@@ -57,7 +57,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Clonar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
