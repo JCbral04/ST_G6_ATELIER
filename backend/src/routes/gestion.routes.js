@@ -1,12 +1,17 @@
 const { Router } = require('express');
+const rateLimit = require('express-rate-limit');
 const { getProductosConStock, getAlertasStockBajo } = require('../controllers/productoController');
 
 const router = Router();
 
-// Ruta para ver productos con su stock (Tarea 2)
-router.get('/productos', getProductosConStock);
+// Limita a máximo 100 solicitudes por IP cada 15 minutos
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
 
-// Ruta para ver alertas de stock bajo (Tarea 3)
-router.get('/inventario/alertas', getAlertasStockBajo);
+// Rutas con rate limiting
+router.get('/productos', limiter, getProductosConStock);
+router.get('/inventario/alertas', limiter, getAlertasStockBajo);
 
 module.exports = router;

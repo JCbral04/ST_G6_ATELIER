@@ -10,7 +10,7 @@ router.get('/health', async (req, res) => {
     const db = await pool.query('SELECT 1 AS ok');
     res.json({ api: 'ATELIER operativa', base_de_datos: db.rows[0].ok === 1 });
   } catch (err) {
-    res.status(500).json({ api: 'ATELIER operativa', base_de_datos: false });
+    res.status(500).json({ api: 'ATELIER operativa', base_de_datos: false, error: err.message });
   }
 });
 
