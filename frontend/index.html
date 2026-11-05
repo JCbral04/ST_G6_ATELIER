@@ -9,36 +9,54 @@
 <body>
 
   <!-- ============ LOGIN ============ -->
+  <!-- El formulario vive en una etiqueta colgante de prenda: el cordón baja
+       desde el borde superior hasta el ojal de la etiqueta. -->
   <section id="login" class="login" hidden>
     <div class="login-brand">
       <h1>atelier</h1>
       <p>Inventario, ventas y compras de la tienda en un solo lugar.</p>
     </div>
-    <form id="login-form" class="login-form" novalidate>
-      <h2>Inicia sesión</h2>
-      <div class="sub">Usa el correo y la contraseña de tu cuenta.</div>
 
-      <div class="field">
-        <label for="correo">Correo <span class="req" aria-hidden="true">*</span></label>
-        <input id="correo" name="correo" type="email" autocomplete="username"
-               placeholder="nombre@atelier.com" required aria-describedby="correo-error">
-        <div class="field-error" id="correo-error" role="alert"></div>
-      </div>
+    <div class="tag-hanger">
+      <span class="tag-string" aria-hidden="true"></span>
+      <form id="login-form" class="tag" novalidate>
+        <span class="tag-hole" aria-hidden="true"></span>
+        <div class="tag-body">
+          <h2>Inicia sesión</h2>
+          <p class="sub">Usa el correo y la contraseña de tu cuenta.</p>
 
-      <div class="field">
-        <label for="contrasena">Contraseña <span class="req" aria-hidden="true">*</span></label>
-        <input id="contrasena" name="contrasena" type="password" autocomplete="current-password"
-               placeholder="Mínimo 6 caracteres" required minlength="6" aria-describedby="contrasena-error">
-        <div class="field-error" id="contrasena-error" role="alert"></div>
-      </div>
+          <div class="field">
+            <label for="correo">Correo</label>
+            <input id="correo" name="correo" type="email" autocomplete="username"
+                   placeholder="nombre@atelier.com" required aria-describedby="correo-error">
+            <div class="field-error" id="correo-error" role="alert"></div>
+          </div>
 
-      <div class="form-error" id="login-error" role="alert"></div>
-      <button type="submit" class="btn btn-block">Ingresar</button>
-      <div class="login-hint">
-        Para probar, entra con <b>admin@atelier.com</b>, <b>vendedor@atelier.com</b>
-        o <b>cliente@atelier.com</b> y la contraseña <b>123456</b>.
-      </div>
-    </form>
+          <div class="field">
+            <label for="contrasena">Contraseña</label>
+            <div class="pass-wrap">
+              <input id="contrasena" name="contrasena" type="password" autocomplete="current-password"
+                     placeholder="Mínimo 6 caracteres" required minlength="6" aria-describedby="contrasena-error">
+              <button type="button" class="pass-toggle" id="pass-toggle" aria-controls="contrasena" aria-pressed="false">Mostrar</button>
+            </div>
+            <div class="field-error" id="contrasena-error" role="alert"></div>
+          </div>
+
+          <div class="form-error" id="login-error" role="alert"></div>
+          <button type="submit" class="btn btn-block">Ingresar</button>
+        </div>
+
+        <!-- Talón desprendible de la etiqueta: información secundaria -->
+        <div class="tag-stub">
+          <p>Cuentas de prueba, todas con la contraseña <b>123456</b>:</p>
+          <ul>
+            <li><button type="button" data-demo="admin@atelier.com">admin@atelier.com</button></li>
+            <li><button type="button" data-demo="vendedor@atelier.com">vendedor@atelier.com</button></li>
+            <li><button type="button" data-demo="cliente@atelier.com">cliente@atelier.com</button></li>
+          </ul>
+        </div>
+      </form>
+    </div>
   </section>
 
   <!-- ============ APP SHELL ============ -->
