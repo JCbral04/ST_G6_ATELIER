@@ -1,11 +1,11 @@
 /* =============================================================
    ATELIER — shell de la aplicación: sesión, navegación y router
-   Rutas por hash: #/dashboard, #/pos, #/inventario, #/catalogo, #/compras
+   Rutas por hash: #/pos (principal), #/dashboard, #/inventario, #/compras
    ============================================================= */
 (function (A) {
   'use strict';
 
-  const ORDER = ['dashboard', 'pos', 'inventario', 'catalogo', 'compras'];
+  const ORDER = ['pos', 'dashboard', 'inventario', 'compras'];   // el POS es la vista principal
   const $ = function (id) { return document.getElementById(id); };
   let current = null;
 
@@ -70,7 +70,7 @@
 
   function route() {
     if (!A.session) return;
-    show(location.hash.replace(/^#\/?/, '') || 'dashboard');
+    show(location.hash.replace(/^#\/?/, '') || 'pos');
   }
 
   async function enterApp() {
@@ -86,7 +86,7 @@
 
   function logout() {
     A.session = null;
-    A.store.cart = [];
+    A.store.venta = [];
     A.storage.remove('atelier.session');
     $('app').hidden = true;
     $('login').hidden = false;
@@ -111,6 +111,10 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openMenu(false); });
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
+    // Los avisos de "por reponer" abren el inventario ya filtrado
+    [$('bell'), $('bell-mini')].forEach(function (a) {
+      a.addEventListener('click', function () { A.views.inventario.soloPorReponer(); if (current === 'inventario') A.app.refresh(); });
+    });
 
     // Recuperar sesión de la pestaña (solo datos públicos del usuario, nunca la contraseña)
     const saved = A.storage.get('atelier.session');

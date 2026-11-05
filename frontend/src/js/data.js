@@ -20,10 +20,10 @@
       { nombre: 'Rojo', codigo_hex: '#C00000' },
     ],
 
-    // Usuarios del seed (para el login provisional; autenticación real = RF-01, Fase 4)
+    // Personal de la tienda (login provisional; autenticación real = RF-01, Fase 4).
+    // El panel es de uso interno: no hay cuentas de clientes.
     usuarios: [
       { id_usuario: 1, nombre: 'Admin ATELIER', correo: 'admin@atelier.com', rol: 'administrador' },
-      { id_usuario: 2, nombre: 'Cliente de prueba', correo: 'cliente@atelier.com', rol: 'cliente' },
       { id_usuario: 3, nombre: 'Vendedor de prueba', correo: 'vendedor@atelier.com', rol: 'vendedor' },
     ],
 
@@ -41,7 +41,7 @@
 
     // Misma forma que GET /api/pedidos (PR #11)
     pedidos: [
-      { id_pedido: 1, fecha: hoyALas(9, 12), estado: 'confirmado', total: 90000, usuario: 'Cliente de prueba' },
+      { id_pedido: 1, fecha: hoyALas(9, 12), estado: 'confirmado', total: 90000, usuario: 'Vendedor de prueba' },
     ],
 
     // Forma esperada de GET /api/compras

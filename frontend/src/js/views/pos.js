@@ -1,6 +1,6 @@
 /* =============================================================
-   Vista: Punto de venta (interfaz). La lógica transaccional
-   vive en POST /api/pedidos (issue #9 / PR #11); sin API se simula.
+   Vista principal: Punto de venta en mostrador. El empleado arma la venta
+   y se registra con POST /api/pedidos; sin API se simula.
    ============================================================= */
 (function (A) {
   'use strict';
@@ -8,13 +8,13 @@
 
   let query = '';
 
-  function cart() { return A.store.cart; }
+  function venta() { return A.store.venta; }
   function variante(id) { return A.store.variantes.find(function (v) { return v.id_variante === id; }); }
   function total() {
-    return cart().reduce(function (t, l) { return t + variante(l.id_variante).precio * l.cantidad; }, 0);
+    return venta().reduce(function (t, l) { return t + variante(l.id_variante).precio * l.cantidad; }, 0);
   }
-  function enCarrito(id) {
-    const l = cart().find(function (x) { return x.id_variante === id; });
+  function enVenta(id) {
+    const l = venta().find(function (x) { return x.id_variante === id; });
     return l ? l.cantidad : 0;
   }
 
@@ -25,7 +25,7 @@
     });
     if (!rows.length) return '<div class="empty">Sin resultados para la búsqueda.</div>';
     return rows.map(function (v) {
-      const libre = v.stock - enCarrito(v.id_variante);
+      const libre = v.stock - enVenta(v.id_variante);
       return `<div class="prod-row">
         <div><div class="nm">${esc(v.producto)}</div>
           <div class="vr">${esc(v.sku)}, talla ${esc(v.talla)}, ${esc(String(v.color).toLowerCase())}.
@@ -39,11 +39,11 @@
     }).join('');
   }
 
-  function cartHtml() {
-    if (!cart().length) return '<div class="cart-empty">Agrega prendas desde la lista para empezar una venta.</div>';
-    return cart().map(function (l) {
+  function ventaHtml() {
+    if (!venta().length) return '<div class="venta-empty">Agrega prendas desde la lista para empezar una venta.</div>';
+    return venta().map(function (l) {
       const v = variante(l.id_variante);
-      return `<div class="cart-line">
+      return `<div class="venta-line">
         <div>${esc(v.producto)}<div class="sub">${esc(v.sku)} a ${fmt(v.precio)}</div></div>
         <div class="price">${fmt(v.precio * l.cantidad)}</div>
         <div class="q">
@@ -67,11 +67,11 @@
           <input class="search" id="pos-search" type="search" placeholder="Busca por nombre o SKU" value="${esc(query)}" aria-label="Buscar producto">
           <div id="prod-list">${listHtml()}</div>
         </div>
-        <div class="cart">
+        <div class="venta">
           <h3>Venta actual</h3>
-          <div id="cart-lines">${cartHtml()}</div>
-          <div class="cart-total"><span>Total</span><span id="cart-total">${fmt(total())}</span></div>
-          <button class="btn btn-accent btn-block" id="checkout" ${cart().length ? '' : 'disabled'}>Confirmar venta</button>
+          <div id="venta-lines">${ventaHtml()}</div>
+          <div class="venta-total"><span>Total</span><span id="venta-total">${fmt(total())}</span></div>
+          <button class="btn btn-accent btn-block" id="checkout" ${venta().length ? '' : 'disabled'}>Confirmar venta</button>
         </div>
       </div>`;
     },
@@ -79,9 +79,9 @@
     bind(root) {
       function repaint() {
         root.querySelector('#prod-list').innerHTML = listHtml();
-        root.querySelector('#cart-lines').innerHTML = cartHtml();
-        root.querySelector('#cart-total').textContent = fmt(total());
-        root.querySelector('#checkout').disabled = !cart().length;
+        root.querySelector('#venta-lines').innerHTML = ventaHtml();
+        root.querySelector('#venta-total').textContent = fmt(total());
+        root.querySelector('#checkout').disabled = !venta().length;
       }
 
       root.querySelector('#pos-search').addEventListener('input', function (e) {
@@ -93,12 +93,12 @@
         const t = e.target.closest('button');
         if (!t) return;
         const id = Number(t.dataset.add || t.dataset.inc || t.dataset.dec || t.dataset.del);
-        const items = cart();
+        const items = venta();
         const line = items.find(function (l) { return l.id_variante === id; });
 
         if (t.dataset.add || t.dataset.inc) {
           const v = variante(id);
-          if (enCarrito(id) + 1 > v.stock) {   // RN-01: no vender más del stock
+          if (enVenta(id) + 1 > v.stock) {   // RN-01: no vender más del stock
             A.toast('<b>No hay más unidades.</b> ' + esc(v.sku) + ' tiene ' + esc(v.stock) + ' disponibles.');
             return;
           }
@@ -115,7 +115,7 @@
           t.disabled = true;
           try {
             const r = await A.api.registrarVenta(A.session.id_usuario, items);
-            A.store.cart = [];
+            A.store.venta = [];
             A.toast('<b>Venta confirmada.</b> Pedido ' + esc(r.id_pedido) + ' por ' + fmt(r.total) + '. El stock ya se descontó.');
             A.app.refresh();
           } catch (err) {
