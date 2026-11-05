@@ -1,13 +1,13 @@
 /* =============================================================
-   Vista: Dashboard — KPIs, últimas ventas y alertas de stock (RF-10)
+   Vista: Resumen — KPIs, últimas ventas y alertas de stock (RF-10)
    ============================================================= */
 (function (A) {
   'use strict';
   const esc = A.esc, fmt = A.fmt;
 
   A.views.dashboard = {
-    title: 'Inicio',
-    nav: 'Inicio',
+    title: 'Resumen',
+    nav: 'Resumen',
     roles: ['administrador', 'vendedor'],
 
     render() {
