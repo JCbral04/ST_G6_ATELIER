@@ -52,7 +52,7 @@
           const low = A.isLow(v);
           const pct = Math.round(Math.min(100, v.stock / max * 100));
           return `<tr class="${low ? 'low' : ''}">
-            <td class="sku">${esc(v.sku)}</td><td>${esc(v.producto)}</td><td>${esc(v.categoria)}</td>
+            <td class="sku">${A.prenda.de(v, 'inv-thumb')}${esc(v.sku)}</td><td>${esc(v.producto)}</td><td>${esc(v.categoria)}</td>
             <td>${esc(v.talla)}</td>
             <td><span class="swatch" style="background:${esc(v.codigo_hex || '#ccc')}"></span>${esc(v.color)}</td>
             <td class="num"><b>${esc(v.stock)}</b></td><td class="num">${esc(v.stock_minimo)}</td>

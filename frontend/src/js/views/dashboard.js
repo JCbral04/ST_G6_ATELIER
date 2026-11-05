@@ -48,8 +48,12 @@
           <h3 class="sec">Por reponer</h3>
           ${bajos.length ? `<ul class="alert-list">${bajos.map(function (v) {
             return `<li class="alert-item">
-              <div class="top"><span class="sku">${esc(v.sku)}</span><span class="left">${esc(v.stock)} de ${esc(v.stock_minimo)} mín.</span></div>
-              <div class="desc">${esc(v.producto)}, talla ${esc(v.talla)}, ${esc(String(v.color).toLowerCase())}</div>
+              <div class="with-thumb">${A.prenda.de(v, 'inv-thumb')}
+                <div style="flex:1">
+                  <div class="top"><span class="sku">${esc(v.sku)}</span><span class="left">${esc(v.stock)} de ${esc(v.stock_minimo)} mín.</span></div>
+                  <div class="desc">${esc(v.producto)}, talla ${esc(v.talla)}, ${esc(String(v.color).toLowerCase())}</div>
+                </div>
+              </div>
             </li>`;
           }).join('')}</ul>` : '<div class="all-good">Todo el inventario está por encima del mínimo.</div>'}
           ${bajos.length && A.app.can('compras') ? '<div class="after-list"><a class="btn-mini" href="#/compras">Ir a compras</a></div>' : ''}

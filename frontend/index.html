@@ -60,30 +60,25 @@
 
   <!-- ============ APP SHELL ============ -->
   <section id="app" class="app" hidden>
-    <header class="mobile-bar">
-      <button id="menu-btn" class="menu-btn" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">Menú</button>
+    <!-- Barra superior: logo, secciones y persona que está en caja.
+         En celular las secciones bajan a una barra fija en la parte inferior. -->
+    <header class="topnav">
       <span class="logo">atelier</span>
-      <a href="#/inventario" class="bell-mini" id="bell-mini" title="Variantes por reponer"><b>0</b> por reponer</a>
-    </header>
-
-    <aside id="sidebar" class="sidebar">
-      <div class="logo">atelier</div>
       <nav id="nav" aria-label="Navegación principal"></nav>
-      <div class="user-box">
-        <b id="user-name">—</b>
-        <span class="role" id="user-role">—</span>
-        <button id="logout-btn" class="link-btn" type="button">Cerrar sesión</button>
+      <div class="top-right">
+        <a href="#/inventario" id="bell" class="bell" title="Variantes por reponer"><b id="low-count">0</b> por reponer</a>
+        <div class="who">
+          <b id="user-name">—</b>
+          <span class="role" id="user-role">—</span>
+        </div>
+        <button id="logout-btn" class="link-btn" type="button">Salir</button>
       </div>
-    </aside>
-    <div id="backdrop" class="backdrop" hidden></div>
+    </header>
 
     <main id="main">
       <div class="topbar">
-        <h2 id="view-title">Inicio</h2>
-        <div class="meta">
-          <span id="data-source" class="pill pill-muted">—</span>
-          <a href="#/inventario" id="bell" class="bell"><b id="low-count">0</b> variantes por reponer</a>
-        </div>
+        <h2 id="view-title">Punto de venta</h2>
+        <span id="data-source" class="pill pill-muted">—</span>
       </div>
       <div id="screen" aria-live="polite"></div>
     </main>
@@ -95,6 +90,7 @@
   <script src="src/js/utils.js"></script>
   <script src="src/js/data.js"></script>
   <script src="src/js/api.js"></script>
+  <script src="src/js/prendas.js"></script>
   <script src="src/js/views/login.js"></script>
   <script src="src/js/views/dashboard.js"></script>
   <script src="src/js/views/pos.js"></script>

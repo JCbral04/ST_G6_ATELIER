@@ -20,19 +20,11 @@
     }).join('');
   }
 
-  function openMenu(open) {
-    $('sidebar').classList.toggle('open', open);
-    $('backdrop').hidden = !open;
-    $('menu-btn').setAttribute('aria-expanded', String(open));
-  }
-
   function updateChrome() {
     const low = A.store.variantes.filter(A.isLow).length;
     $('low-count').textContent = low;
-    $('bell-mini').querySelector('b').textContent = low;
     const canInv = A.app.can('inventario');
     $('bell').hidden = !canInv;
-    $('bell-mini').hidden = !canInv;
     const src = A.api.sourceLabel();
     const pill = $('data-source');
     pill.textContent = src.text;
@@ -64,7 +56,6 @@
     if (v.bind) v.bind(root);
 
     updateChrome();
-    openMenu(false);
     if (location.hash !== '#/' + view) history.replaceState(null, '', '#/' + view);
   }
 
@@ -106,14 +97,12 @@
       enterApp();
     });
 
-    $('menu-btn').addEventListener('click', function () { openMenu(!$('sidebar').classList.contains('open')); });
-    $('backdrop').addEventListener('click', function () { openMenu(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openMenu(false); });
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
     // Los avisos de "por reponer" abren el inventario ya filtrado
-    [$('bell'), $('bell-mini')].forEach(function (a) {
-      a.addEventListener('click', function () { A.views.inventario.soloPorReponer(); if (current === 'inventario') A.app.refresh(); });
+    $('bell').addEventListener('click', function () {
+      A.views.inventario.soloPorReponer();
+      if (current === 'inventario') A.app.refresh();
     });
 
     // Recuperar sesión de la pestaña (solo datos públicos del usuario, nunca la contraseña)

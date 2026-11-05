@@ -27,16 +27,23 @@
       { id_usuario: 3, nombre: 'Vendedor de prueba', correo: 'vendedor@atelier.com', rol: 'vendedor' },
     ],
 
-    // Forma esperada de GET /api/inventario (una fila por variante)
+    // Forma esperada de GET /api/inventario (una fila por variante).
+    // `imagen` es opcional: si falta, la interfaz dibuja la prenda con su color.
     variantes: [
-      { id_variante: 1, sku: 'CAM-NEG-M', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'M', color: 'Negro', codigo_hex: '#000000', precio: 45000, stock: 68, stock_minimo: 10 },
-      { id_variante: 2, sku: 'CAM-BLA-M', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'M', color: 'Blanco', codigo_hex: '#FFFFFF', precio: 45000, stock: 40, stock_minimo: 10 },
-      { id_variante: 3, sku: 'JEA-AZU-32', id_producto: 2, producto: 'Jean clásico azul', categoria: 'Pantalones', talla: 'M', color: 'Azul', codigo_hex: '#1F4E79', precio: 129900, stock: 30, stock_minimo: 5 },
-      { id_variante: 4, sku: 'CHA-AZU-L', id_producto: 3, producto: 'Chaqueta denim', categoria: 'Chaquetas', talla: 'L', color: 'Azul', codigo_hex: '#1F4E79', precio: 199900, stock: 15, stock_minimo: 3 },
+      { id_variante: 1, sku: 'CAM-NEG-M', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'M', color: 'Negro', codigo_hex: '#000000', precio: 45000, stock: 68, imagen: 'src/img/prendas/camiseta-negra.webp', stock_minimo: 10 },
+      { id_variante: 2, sku: 'CAM-BLA-M', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'M', color: 'Blanco', codigo_hex: '#FFFFFF', precio: 45000, stock: 40, imagen: 'src/img/prendas/camiseta-blanca.webp', stock_minimo: 10 },
+      { id_variante: 3, sku: 'JEA-AZU-32', id_producto: 2, producto: 'Jean clásico azul', categoria: 'Pantalones', talla: 'M', color: 'Azul', codigo_hex: '#1F4E79', precio: 129900, stock: 30, imagen: 'src/img/prendas/jean-azul.webp', stock_minimo: 5 },
+      { id_variante: 4, sku: 'CHA-AZU-L', id_producto: 3, producto: 'Chaqueta denim', categoria: 'Chaquetas', talla: 'L', color: 'Azul', codigo_hex: '#1F4E79', precio: 199900, stock: 15, imagen: 'src/img/prendas/chaqueta-azul.webp', stock_minimo: 3 },
       // Solo demo: dos variantes con stock bajo para visualizar las alertas (RF-10).
       // Propuesta para #10: agregarlas también a db/seed.sql.
-      { id_variante: 5, sku: 'CAM-ROJ-S', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'S', color: 'Rojo', codigo_hex: '#C00000', precio: 45000, stock: 8, stock_minimo: 10 },
-      { id_variante: 6, sku: 'JEA-NEG-S', id_producto: 2, producto: 'Jean clásico azul', categoria: 'Pantalones', talla: 'S', color: 'Negro', codigo_hex: '#000000', precio: 129900, stock: 3, stock_minimo: 5 },
+      { id_variante: 5, sku: 'CAM-ROJ-S', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'S', color: 'Rojo', codigo_hex: '#C00000', precio: 45000, stock: 8, imagen: 'src/img/prendas/camiseta-roja.webp', stock_minimo: 10 },
+      { id_variante: 6, sku: 'JEA-NEG-S', id_producto: 2, producto: 'Jean clásico azul', categoria: 'Pantalones', talla: 'S', color: 'Negro', codigo_hex: '#000000', precio: 129900, stock: 3, imagen: 'src/img/prendas/jean-negro.webp', stock_minimo: 5 },
+      // Solo demo: más tallas para que el punto de venta muestre la selección por talla.
+      { id_variante: 7, sku: 'CAM-NEG-S', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'S', color: 'Negro', codigo_hex: '#000000', precio: 45000, stock: 12, imagen: 'src/img/prendas/camiseta-negra.webp', stock_minimo: 10 },
+      { id_variante: 8, sku: 'CAM-NEG-L', id_producto: 1, producto: 'Camiseta básica algodón', categoria: 'Camisetas', talla: 'L', color: 'Negro', codigo_hex: '#000000', precio: 45000, stock: 25, imagen: 'src/img/prendas/camiseta-negra.webp', stock_minimo: 10 },
+      { id_variante: 9, sku: 'JEA-AZU-L', id_producto: 2, producto: 'Jean clásico azul', categoria: 'Pantalones', talla: 'L', color: 'Azul', codigo_hex: '#1F4E79', precio: 129900, stock: 18, imagen: 'src/img/prendas/jean-azul.webp', stock_minimo: 5 },
+      { id_variante: 10, sku: 'CHA-AZU-M', id_producto: 3, producto: 'Chaqueta denim', categoria: 'Chaquetas', talla: 'M', color: 'Azul', codigo_hex: '#1F4E79', precio: 199900, stock: 9, imagen: 'src/img/prendas/chaqueta-azul.webp', stock_minimo: 3 },
+      { id_variante: 11, sku: 'CHA-NEG-L', id_producto: 3, producto: 'Chaqueta denim', categoria: 'Chaquetas', talla: 'L', color: 'Negro', codigo_hex: '#000000', precio: 199900, stock: 0, imagen: 'src/img/prendas/chaqueta-negra.webp', stock_minimo: 3 },
     ],
 
     // Misma forma que GET /api/pedidos (PR #11)
