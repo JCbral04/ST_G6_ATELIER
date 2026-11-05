@@ -3,30 +3,32 @@
 ![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
 ![Universidad](https://img.shields.io/badge/UMB-Sistema%20Transaccional-red)
 
-**ATELIER** es un sistema transaccional tipo ERP (Enterprise Resource Planning) para la gestión integral de una tienda de ropa. La plataforma centraliza la administración de productos, inventario, ventas, compras a proveedores y reportes gerenciales, garantizando la consistencia de la información y la trazabilidad de las operaciones.
+**ATELIER** es un sistema transaccional tipo ERP (Enterprise Resource Planning) para la gestión integral de una tienda de ropa. La plataforma centraliza la administración de productos, inventario, ventas en punto de venta (POS), compras a proveedores y reportes gerenciales, garantizando la consistencia de la información y la trazabilidad de las operaciones.
 
 Proyecto académico desarrollado en la **Universidad Manuela Beltrán** — asignatura Sistema Transaccional, Grupo 6.
+
+&gt; **Nota de alcance (Guía 2, Fase III):** por indicación del docente, el proyecto se orienta exclusivamente como **ERP de uso interno**. No incluye funcionalidad de comercio electrónico (carrito de compras en línea ni venta a clientes web); las ventas se registran en el punto de venta físico por un empleado.
 
 ---
 
 ## Objetivo general
 
-Desarrollar un ERP que permita gestionar de manera eficiente e integrada los procesos de una tienda de ropa —catálogo de productos, inventario, ventas, compras a proveedores y análisis de datos—, garantizando la consistencia de la información, la trazabilidad de las operaciones y la generación de reportes de apoyo a la toma de decisiones.
+Desarrollar un ERP que permita gestionar de manera eficiente e integrada los procesos de una tienda de ropa —catálogo de productos, inventario, ventas en mostrador, compras a proveedores y análisis de datos—, garantizando la consistencia de la información, la trazabilidad de las operaciones y la generación de reportes de apoyo a la toma de decisiones.
 
 ## Módulos del sistema
 
 | Módulo | Descripción |
 |---|---|
-| Autenticación y usuarios | Registro, inicio de sesión y administración de usuarios y roles |
+| Autenticación y usuarios | Inicio de sesión y administración de usuarios y roles del personal |
 | Catálogo de productos | CRUD de productos, categorías, tallas, colores y precios |
 | Inventario | Entradas, salidas, actualización automática de stock y alertas de stock mínimo |
-| Ventas | Carrito de compras, registro de pedidos, seguimiento de estados e historial |
+| Ventas (POS) | Registro de ventas en mostrador, seguimiento de estados e historial de pedidos |
 | Compras | Gestión de proveedores y compras con recepción de mercancía |
 | Reportes gerenciales | Tableros de indicadores integrados con Power BI |
 
 ## Roles de usuario
 
-- **Cliente / Vendedor:** registrarse e iniciar sesión, consultar productos y disponibilidad en tiempo real, filtrar por categoría, talla, color y precio, agregar productos al carrito, realizar compras y consultar su historial de pedidos.
+- **Empleado / Vendedor:** iniciar sesión, consultar productos y disponibilidad en tiempo real, filtrar por categoría, talla, color y precio, registrar ventas en el punto de venta y consultar el historial de pedidos.
 - **Administrador:** gestionar productos (CRUD), administrar categorías, tallas y colores, controlar inventario (entradas, salidas, stock mínimo), gestionar ventas, pedidos y compras a proveedores, administrar usuarios y roles, y visualizar reportes gerenciales (Power BI).
 
 ## Stack tecnológico
@@ -55,7 +57,7 @@ ST_G6_ATELIER/
 ├── db/                    # Base de datos (Fase 3)
 │   ├── schema.sql         # Creación de BD, tablas, claves, restricciones y triggers
 │   └── seed.sql           # Datos iniciales de prueba
-├── frontend/              # Interfaz web (Fase 3: pantallas principales)
+├── frontend/              # Panel interno del ERP (Fase 3: pantallas principales)
 │   ├── index.html
 │   └── src/               # css/ y js/ (vistas, router, capa de datos)
 └── backend/               # API REST (Fase 3: estructura inicial)
