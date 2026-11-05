@@ -37,6 +37,34 @@
       const pass = document.getElementById('contrasena');
       const formErr = document.getElementById('login-error');
 
+      // La etiqueta se mece un poco cuando algo no está bien
+      function nudge() {
+        form.classList.remove('nudge');
+        void form.offsetWidth;            // reinicia la animación
+        form.classList.add('nudge');
+      }
+      form.addEventListener('animationend', function () { form.classList.remove('nudge'); });
+
+      // Mostrar / ocultar contraseña
+      const toggle = document.getElementById('pass-toggle');
+      function setVisible(show) {
+        pass.type = show ? 'text' : 'password';
+        toggle.textContent = show ? 'Ocultar' : 'Mostrar';
+        toggle.setAttribute('aria-pressed', String(show));
+      }
+      toggle.addEventListener('click', function () { setVisible(pass.type === 'password'); pass.focus(); });
+
+      // Cuentas de prueba del talón: llenan el formulario
+      form.querySelectorAll('[data-demo]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          correo.value = b.dataset.demo;
+          pass.value = '123456';
+          formErr.textContent = '';
+          validateCorreo(correo); validateContrasena(pass);
+          form.querySelector('button[type=submit]').focus();
+        });
+      });
+
       // Valida al salir del campo y corrige en vivo una vez marcado como inválido
       correo.addEventListener('blur', function () { validateCorreo(correo); });
       pass.addEventListener('blur', function () { validateContrasena(pass); });
@@ -54,6 +82,7 @@
         const ok = [validateCorreo(correo), validateContrasena(pass)].every(Boolean);
         if (!ok) {
           (form.querySelector('.invalid input') || correo).focus();
+          nudge();
           return;
         }
         // Autenticación provisional contra los usuarios del seed.
@@ -66,9 +95,11 @@
           pass.value = '';
           pass.closest('.field').classList.remove('valid');
           pass.focus();
+          nudge();
           return;
         }
         form.reset();
+        setVisible(false);
         form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
         onSuccess(user);
       });

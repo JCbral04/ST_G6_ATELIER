@@ -1,11 +1,11 @@
 /* =============================================================
    ATELIER — shell de la aplicación: sesión, navegación y router
-   Rutas por hash: #/dashboard, #/pos, #/inventario, #/catalogo, #/compras
+   Rutas por hash: #/pos (principal), #/dashboard, #/inventario, #/compras
    ============================================================= */
 (function (A) {
   'use strict';
 
-  const ORDER = ['dashboard', 'pos', 'inventario', 'catalogo', 'compras'];
+  const ORDER = ['pos', 'dashboard', 'inventario', 'compras'];   // el POS es la vista principal
   const $ = function (id) { return document.getElementById(id); };
   let current = null;
 
@@ -14,25 +14,35 @@
   }
 
   function renderNav() {
-    $('nav').innerHTML = allowed().map(function (k) {
+    $('nav').innerHTML = '<span class="nav-slider" aria-hidden="true"></span>' + allowed().map(function (k) {
       const v = A.views[k];
       return `<a href="#/${k}" data-v="${k}">${A.esc(v.nav || v.title)}</a>`;
     }).join('');
   }
 
-  function openMenu(open) {
-    $('sidebar').classList.toggle('open', open);
-    $('backdrop').hidden = !open;
-    $('menu-btn').setAttribute('aria-expanded', String(open));
+  // Mueve el broche del metro hasta la sección activa
+  function moverBroche() {
+    const on = document.querySelector('#nav a.on');
+    const slider = document.querySelector('#nav .nav-slider');
+    if (!on || !slider) return;
+    slider.style.width = on.offsetWidth + 'px';
+    slider.style.transform = 'translateX(' + on.offsetLeft + 'px)';
+  }
+
+  // Números del metro: uno por cada rayita larga (cada 40px)
+  function numerarMetro() {
+    const cont = $('tape-num');
+    const n = Math.ceil(cont.offsetWidth / 40);
+    let html = '';
+    for (let i = 1; i <= n; i++) html += '<span style="left:' + (i * 40) + 'px">' + i + '</span>';
+    cont.innerHTML = html;
   }
 
   function updateChrome() {
     const low = A.store.variantes.filter(A.isLow).length;
     $('low-count').textContent = low;
-    $('bell-mini').querySelector('b').textContent = low;
     const canInv = A.app.can('inventario');
     $('bell').hidden = !canInv;
-    $('bell-mini').hidden = !canInv;
     const src = A.api.sourceLabel();
     const pill = $('data-source');
     pill.textContent = src.text;
@@ -64,13 +74,13 @@
     if (v.bind) v.bind(root);
 
     updateChrome();
-    openMenu(false);
+    moverBroche();
     if (location.hash !== '#/' + view) history.replaceState(null, '', '#/' + view);
   }
 
   function route() {
     if (!A.session) return;
-    show(location.hash.replace(/^#\/?/, '') || 'dashboard');
+    show(location.hash.replace(/^#\/?/, '') || 'pos');
   }
 
   async function enterApp() {
@@ -79,6 +89,7 @@
     $('user-name').textContent = A.session.nombre;
     $('user-role').textContent = A.session.rol;
     renderNav();
+    numerarMetro();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
     await A.api.load();
     route();
@@ -86,7 +97,7 @@
 
   function logout() {
     A.session = null;
-    A.store.cart = [];
+    A.store.venta = [];
     A.storage.remove('atelier.session');
     $('app').hidden = true;
     $('login').hidden = false;
@@ -106,11 +117,16 @@
       enterApp();
     });
 
-    $('menu-btn').addEventListener('click', function () { openMenu(!$('sidebar').classList.contains('open')); });
-    $('backdrop').addEventListener('click', function () { openMenu(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openMenu(false); });
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
+    window.addEventListener('resize', function () { if (A.session) { numerarMetro(); moverBroche(); } });
+    // Las fuentes cambian el ancho de las secciones: recolocar el broche cuando carguen
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (A.session) moverBroche(); });
+    // Los avisos de "por reponer" abren el inventario ya filtrado
+    $('bell').addEventListener('click', function () {
+      A.views.inventario.soloPorReponer();
+      if (current === 'inventario') A.app.refresh();
+    });
 
     // Recuperar sesión de la pestaña (solo datos públicos del usuario, nunca la contraseña)
     const saved = A.storage.get('atelier.session');

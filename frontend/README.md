@@ -1,19 +1,23 @@
-# ATELIER — Interfaz web (Fase III)
+# ATELIER — Panel interno del ERP (Fase III)
 
-Pantallas principales del ERP, construidas a partir del prototipo de alta fidelidad
-(`docs/prototipo/index.html`) con la paleta del equipo: violeta `#9314EB` (marca, acciones y
-lo que hay que reponer), azul `#129AED` (información y estados OK), blanco y negro. HTML + CSS + JavaScript sin dependencias ni build,
-para que corra igual en cualquier equipo del grupo. La migración a React queda para la Fase 4.
+Herramienta de uso interno para el personal de la tienda (administrador y vendedores).
+No es una tienda en línea: no hay cuentas de clientes ni compras desde la web. Las ventas
+las registra un empleado en el punto de venta del mostrador.
+
+Construido a partir del prototipo de alta fidelidad (`docs/prototipo/index.html`) con la
+paleta del equipo: violeta `#9314EB` (marca, acciones y lo que hay que reponer), azul
+`#129AED` (información y estados OK), blanco y negro. HTML + CSS + JavaScript sin
+dependencias ni build, para que corra igual en cualquier equipo del grupo. La migración a
+React queda para la Fase 4.
 
 ## Pantallas
 
 | Ruta | Pantalla | Roles | Requisitos |
 |---|---|---|---|
-| — | Login con validación visual de campos obligatorios | todos | RF-01 (provisional) |
-| `#/dashboard` | KPIs, últimas ventas y alertas de stock mínimo | administrador, vendedor | RF-10 |
-| `#/pos` | Punto de venta: carrito, cantidades y confirmación | administrador, vendedor | RF-11, RF-12 (lógica en #9) |
-| `#/inventario` | Existencias por variante, nivel y estado | administrador, vendedor | RF-09, RF-10 |
-| `#/catalogo` | Catálogo con filtros por categoría, talla, color y precio | todos | RF-06, RF-07 |
+| — | Acceso del personal con validación visual de campos obligatorios | administrador, vendedor | RF-01 (provisional) |
+| `#/pos` | **Vista principal.** Venta en mostrador: prendas, cantidades y confirmación contra `POST /api/pedidos` | administrador, vendedor | RF-11, RF-12 |
+| `#/dashboard` | Resumen: ventas del día, últimas ventas y variantes por reponer | administrador, vendedor | RF-10 |
+| `#/inventario` | Existencias por variante (SKU, talla, color, stock y mínimo) con filtros por categoría, talla, color y estado | administrador, vendedor | RF-06, RF-07, RF-09, RF-10 |
 | `#/compras` | Órdenes de compra y directorio de proveedores | administrador | RF-16..18 |
 
 La interfaz es responsive (RNF-06): en celular la navegación lateral pasa a un menú
@@ -36,8 +40,8 @@ Express sirve esta carpeta como estática, así que la interfaz y la API compart
 cd frontend && python3 -m http.server 8080   # http://localhost:8080
 ```
 
-Usuarios de prueba (los del `db/seed.sql`), contraseña `123456`:
-`admin@atelier.com` · `vendedor@atelier.com` · `cliente@atelier.com`.
+Cuentas de prueba del personal, contraseña `123456`: `admin@atelier.com` y
+`vendedor@atelier.com`. También aparecen en el login para llenarlo con un clic.
 
 ## Datos: API real o modo demo
 
@@ -47,7 +51,7 @@ de `src/js/data.js` (espejo del seed). El indicador del encabezado muestra
 
 | Recurso | Endpoint esperado | Estado |
 |---|---|---|
-| Variantes con stock | `GET /api/inventario` | pendiente (#10) |
+| Variantes con stock | `GET /api/inventario` | pendiente (PR #15) |
 | Pedidos | `GET /api/pedidos`, `POST /api/pedidos` | PR #11 |
 | Compras | `GET /api/compras`, `PATCH /api/compras/:id` | Fase 4 |
 | Proveedores | `GET /api/proveedores` | Fase 4 |
@@ -75,5 +79,5 @@ frontend/
         ├── data.js       # datos de respaldo (modo demo)
         ├── api.js        # carga desde la API con respaldo
         ├── app.js        # sesión, roles, navegación y router por hash
-        └── views/        # login, dashboard, pos, inventario, catalogo, compras
+        └── views/        # login, pos, dashboard, inventario, compras
 ```
