@@ -120,6 +120,8 @@
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
     window.addEventListener('resize', function () { if (A.session) { numerarMetro(); moverBroche(); } });
+    // Las fuentes cambian el ancho de las secciones: recolocar el broche cuando carguen
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (A.session) moverBroche(); });
     // Los avisos de "por reponer" abren el inventario ya filtrado
     $('bell').addEventListener('click', function () {
       A.views.inventario.soloPorReponer();

@@ -49,6 +49,9 @@
     // Misma forma que GET /api/pedidos (PR #11)
     pedidos: [
       { id_pedido: 1, fecha: hoyALas(9, 12), estado: 'confirmado', total: 90000, usuario: 'Vendedor de prueba' },
+      // Solo demo: más ventas de hoy para que el resumen muestre varios tiquetes.
+      { id_pedido: 2, fecha: hoyALas(10, 47), estado: 'confirmado', total: 199900, usuario: 'Admin ATELIER' },
+      { id_pedido: 3, fecha: hoyALas(11, 20), estado: 'pendiente', total: 174900, usuario: 'Vendedor de prueba' },
     ],
 
     // Forma esperada de GET /api/compras
