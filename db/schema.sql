@@ -13,9 +13,8 @@ CREATE DATABASE atelier_db;
 -- Extension para contraseñas (preparación para Fase 4)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- =============================================================
--- 2. Tablas principales (en orden de dependencia)
--- =============================================================
+-- Venta de mostrador (POS): id_usuario es el empleado (administrador o vendedor)
+-- que registra la venta, no un cliente web.
 
 CREATE TABLE categoria (
     id_categoria SERIAL PRIMARY KEY,
@@ -83,19 +82,6 @@ CREATE TABLE detalle_pedido (
     id_variante     INT            NOT NULL REFERENCES variante_producto(id_variante)
 );
 
-CREATE TABLE carrito_compra (
-    id_carrito     SERIAL PRIMARY KEY,
-    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    activo         BOOLEAN   NOT NULL DEFAULT TRUE,
-    id_usuario     INT       NOT NULL REFERENCES usuario(id_usuario)
-);
-
-CREATE TABLE item_carrito (
-    id_item     SERIAL PRIMARY KEY,
-    cantidad    INT NOT NULL CHECK (cantidad > 0),
-    id_carrito  INT NOT NULL REFERENCES carrito_compra(id_carrito),
-    id_variante INT NOT NULL REFERENCES variante_producto(id_variante)
-);
 
 CREATE TABLE movimiento_inventario (
     id_movimiento SERIAL PRIMARY KEY,
