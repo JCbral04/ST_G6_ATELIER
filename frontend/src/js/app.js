@@ -14,10 +14,28 @@
   }
 
   function renderNav() {
-    $('nav').innerHTML = allowed().map(function (k) {
+    $('nav').innerHTML = '<span class="nav-slider" aria-hidden="true"></span>' + allowed().map(function (k) {
       const v = A.views[k];
       return `<a href="#/${k}" data-v="${k}">${A.esc(v.nav || v.title)}</a>`;
     }).join('');
+  }
+
+  // Mueve el broche del metro hasta la sección activa
+  function moverBroche() {
+    const on = document.querySelector('#nav a.on');
+    const slider = document.querySelector('#nav .nav-slider');
+    if (!on || !slider) return;
+    slider.style.width = on.offsetWidth + 'px';
+    slider.style.transform = 'translateX(' + on.offsetLeft + 'px)';
+  }
+
+  // Números del metro: uno por cada rayita larga (cada 40px)
+  function numerarMetro() {
+    const cont = $('tape-num');
+    const n = Math.ceil(cont.offsetWidth / 40);
+    let html = '';
+    for (let i = 1; i <= n; i++) html += '<span style="left:' + (i * 40) + 'px">' + i + '</span>';
+    cont.innerHTML = html;
   }
 
   function updateChrome() {
@@ -56,6 +74,7 @@
     if (v.bind) v.bind(root);
 
     updateChrome();
+    moverBroche();
     if (location.hash !== '#/' + view) history.replaceState(null, '', '#/' + view);
   }
 
@@ -70,6 +89,7 @@
     $('user-name').textContent = A.session.nombre;
     $('user-role').textContent = A.session.rol;
     renderNav();
+    numerarMetro();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
     await A.api.load();
     route();
@@ -99,6 +119,7 @@
 
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
+    window.addEventListener('resize', function () { if (A.session) { numerarMetro(); moverBroche(); } });
     // Los avisos de "por reponer" abren el inventario ya filtrado
     $('bell').addEventListener('click', function () {
       A.views.inventario.soloPorReponer();

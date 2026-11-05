@@ -183,11 +183,34 @@ nav a {
 }
 nav a:hover { background: rgba(255,255,255,.14); }
 /* sección activa = el broche metálico del metro */
-nav a.on { background: var(--black); color: var(--white); }
-nav a.on::after {
+/* Sección activa = el broche negro del metro, que se desliza entre secciones */
+nav { position: relative; }
+nav a.on { color: var(--white); }
+nav a { z-index: 1; }
+.nav-slider {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--black); border-radius: 6px;
+  transition: transform .38s cubic-bezier(.3, 1.3, .5, 1), width .38s cubic-bezier(.3, 1.3, .5, 1);
+  pointer-events: none;
+}
+.nav-slider::after {
   content: ''; position: absolute; left: 50%; bottom: -12px; margin-left: -6px;
   border: 6px solid transparent; border-top-color: var(--black);
 }
+/* Números del metro sobre las rayitas largas (cada 40px = 1) */
+.tape-num { position: absolute; left: 0; right: 0; bottom: 14px; height: 12px; pointer-events: none; overflow: hidden; }
+.tape-num span {
+  position: absolute; bottom: 0; transform: translateX(-50%);
+  font: 600 9px/1 var(--body); color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums;
+}
+/* Puntera metálica del metro, con sus remaches */
+.tape-tip {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 14px; background: var(--black);
+  background-image:
+    radial-gradient(circle at 7px 20px, #fff 0 2px, transparent 2.5px),
+    radial-gradient(circle at 7px 46px, #fff 0 2px, transparent 2.5px);
+}
+.topnav .logo, nav, .top-right { position: relative; z-index: 1; }
+
 .top-right { display: flex; align-items: center; gap: 18px; font-size: 14px; }
 .top-right .bell { color: var(--white); font-weight: 600; text-decoration: none; padding: 6px 10px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,.7); }
 .top-right .bell:hover { background: rgba(255,255,255,.14); }
@@ -427,7 +450,7 @@ img.inv-thumb { padding: 3px; object-fit: contain; }
 }
 #toast.show { opacity: 1; transform: none; }
 #toast b { color: #C99BF7; }
-@media (prefers-reduced-motion: reduce) { #toast, .tela { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #toast, .tela, .nav-slider { transition: none; } }
 
 /* =============================================================
    Responsive (RNF-06): tablet y celular
@@ -460,7 +483,8 @@ img.inv-thumb { padding: 3px; object-fit: contain; }
   nav a { flex: 1; text-align: center; color: var(--black); padding: 10px 4px; font-size: 14px; }
   nav a:hover { background: var(--surface); }
   nav a.on { background: var(--black); color: var(--white); }
-  nav a.on::after { display: none; }
+  .nav-slider { display: none; }
+  .tape-tip { width: 10px; background-image: radial-gradient(circle at 5px 18px, #fff 0 1.6px, transparent 2px), radial-gradient(circle at 5px 40px, #fff 0 1.6px, transparent 2px); }
   main { padding: 22px 16px 150px; }
   .topbar { margin-bottom: 18px; }
   .topbar h2 { font-size: 28px; }
