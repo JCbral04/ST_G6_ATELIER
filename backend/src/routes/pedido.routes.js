@@ -152,5 +152,63 @@ router.post('/', async (req, res) => {
     client.release();
   }
 });
+router.post('/:id/cancelar', async (req, res) => {
+  const { id_usuario } = req.body;
+  if (!id_usuario) {
+    return res.status(400).json({ error: 'Campo obligatorio: id_usuario' });
+  }
 
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Solo un administrador puede anular ventas
+    const admin = await client.query(
+      `SELECT id_usuario FROM usuario WHERE id_usuario = $1 AND rol = 'administrador'`,
+      [id_usuario]
+    );
+    if (admin.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Solo un administrador puede anular ventas' });
+    }
+
+    // 2. Bloquear el pedido (FOR UPDATE) para que nadie lo modifique durante la anulación
+    const pedido = await client.query(
+      'SELECT id_pedido, estado FROM pedido WHERE id_pedido = $1 FOR UPDATE',
+      [req.params.id]
+    );
+    if (pedido.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+    if (pedido.rows[0].estado === 'cancelado') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'La venta ya está anulada' });
+    }
+
+    // 3. Marcar como cancelado — el trigger trg_stock_cancelacion devuelve el stock
+    await client.query(
+      `UPDATE pedido SET estado = 'cancelado' WHERE id_pedido = $1`,
+      [req.params.id]
+    );+
+    
+
+    // 4. Registrar la reversa como movimientos de inventario (trazabilidad)
+    await client.query(
+      `INSERT INTO movimiento_inventario (tipo, cantidad, motivo, id_variante, id_usuario)
+       SELECT 'entrada', d.cantidad, $2, d.id_variante, $3
+       FROM detalle_pedido d
+       WHERE d.id_pedido = $1`,
+      [req.params.id, `Anulación de la venta #${req.params.id}`, id_usuario]
+    );
+
+    await client.query('COMMIT');
+    res.json({ mensaje: `Venta #${req.params.id} anulada; el stock fue devuelto al inventario` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: 'Error al anular la venta; no se hizo ningún cambio' });
+  } finally {
+    client.release();
+  }
+});
 module.exports = router;
