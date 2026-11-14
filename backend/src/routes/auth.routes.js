@@ -17,6 +17,17 @@ const loginLimiter = rateLimit({
   }
 });
 
+// Limitar las operaciones autenticadas para reducir abuso y consultas excesivas
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas solicitudes, intenta más tarde'
+  }
+});
+
 router.post('/login', loginLimiter, async (req, res) => {
   const { correo, contrasena } = req.body || {};
 
@@ -73,11 +84,15 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 });
 
-router.get('/me', autenticar, (req, res) => {
-  res.json({ usuario: req.usuario });
+router.get('/me', authLimiter, autenticar, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+
+  return res.status(200).json({
+    usuario: req.usuario
+  });
 });
 
-router.post('/logout', autenticar, async (req, res) => {
+router.post('/logout', authLimiter, autenticar, async (req, res) => {
   try {
     await pool.query(
       `UPDATE sesion_usuario
