@@ -19,7 +19,9 @@ router.get('/health', async (req, res) => {
 // router.use('/pedidos', require('./pedido.routes'));     // RF-09..12 ventas
 // router.use('/inventario', require('./inventario.routes')); // RF-13..15 inventario
 // router.use('/compras', require('./compra.routes'));     // RF-16..18 compras/proveedores
+// Módulos activos
 router.use('/pedidos', require('./pedido.routes'));
-router.use('/inventario/movimientos', require('./movimiento.routes')); // ajustes manuales (issue #26)
+router.use('/auth', require('./auth.routes'));
+router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
 
 module.exports = router;
