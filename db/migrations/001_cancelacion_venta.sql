@@ -14,6 +14,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Permite ejecutar nuevamente la migración sin duplicar el trigger.
+DROP TRIGGER IF EXISTS trg_stock_cancelacion ON pedido;
+
 CREATE TRIGGER trg_stock_cancelacion
     AFTER UPDATE OF estado ON pedido
-    FOR EACH ROW EXECUTE FUNCTION fn_stock_cancelacion();
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_stock_cancelacion();

@@ -40,6 +40,14 @@ router.get('/', permitirRoles('vendedor', 'administrador'), async (req, res) => 
 
 // GET /api/pedidos/:id — detalle de un pedido (RF-13)
 router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) => {
+  const idPedido = Number(req.params.id);
+
+  if (!/^[1-9]\d*$/.test(req.params.id) ||
+      !Number.isSafeInteger(idPedido)) {
+    return res.status(400).json({
+      error: 'El ID del pedido debe ser un entero positivo'
+    });
+  }
   try {
     const esAdmin = req.usuario.rol === 'administrador';
 
@@ -50,7 +58,7 @@ router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) 
       JOIN usuario u ON u.id_usuario = p.id_usuario
       WHERE p.id_pedido = $1
         AND ($2::boolean OR p.id_usuario = $3)`,
-      [req.params.id, esAdmin, req.usuario.id_usuario]
+      [idPedido, esAdmin, req.usuario.id_usuario]
     );
     if (pedido.rows.length === 0) {
       return res.status(404).json({ error: 'Pedido no encontrado' });
@@ -62,7 +70,7 @@ router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) 
        JOIN variante_producto v ON v.id_variante = d.id_variante
        JOIN producto pr ON pr.id_producto = v.id_producto
        WHERE d.id_pedido = $1`,
-      [req.params.id]
+      [idPedido]
     );
     res.json({ ...pedido.rows[0], items: detalle.rows });
   } catch (err) {
@@ -84,9 +92,17 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
     });
   }
   for (const item of items) {
-    if (!item.id_variante || !Number.isInteger(item.cantidad) || item.cantidad <= 0) {
+    if (
+      item === null ||
+      typeof item !== 'object' ||
+      Array.isArray(item) ||
+      !Number.isSafeInteger(item.id_variante) ||
+      item.id_variante <= 0 ||
+      !Number.isSafeInteger(item.cantidad) ||
+      item.cantidad <= 0
+    ) {
       return res.status(400).json({
-        error: 'Cada ítem debe tener id_variante y una cantidad entera mayor a 0',
+        error: 'Cada ítem debe incluir id_variante y cantidad como enteros positivos'
       });
     }
   }

@@ -193,6 +193,28 @@ codigo=$(curl -sS -o /dev/null -w '%{http_code}' \
 check "Cancelación por vendedor rechazada" "403" "$codigo"
 
 
+# Validar identificadores de pedidos incorrectos
+codigo=$(curl -sS -o /dev/null -w '%{http_code}' \
+    "$api_url/pedidos/abc" \
+    -H "Authorization: Bearer $token_vendedor")
+
+check "ID de pedido inválido rechazado" "400" "$codigo"
+
+# Rechazar ítems null sin provocar errores internos
+codigo=$(curl -sS -o /dev/null -w '%{http_code}' \
+    -X POST "$api_url/pedidos" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $token_vendedor" \
+    -d '{"items":[null]}')
+
+check "Ítem null rechazado correctamente" "400" "$codigo"
+
+# Verificar que el backend continúa disponible
+codigo=$(curl -sS -o /dev/null -w '%{http_code}' \
+    "$api_url/health")
+
+check "Backend operativo tras entrada inválida" "200" "$codigo"
+
 echo "-------------------------------------"
 echo " Atelier Pruebas Transaccionales"
 echo "-------------------------------------"
