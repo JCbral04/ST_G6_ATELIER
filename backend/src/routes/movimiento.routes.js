@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const { pool } = require('../config/db');
 const rateLimit = require('express-rate-limit');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = Router();
 
-// Mismo límite que el resto de la API (mitiga abuso / DoS)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -17,16 +17,14 @@ router.use(limiter);
 
 const TIPOS = ['entrada', 'salida'];
 const ROLES_PERMITIDOS = ['administrador', 'vendedor'];
-const MOTIVO_MAX = 200; // igual que movimiento_inventario.motivo VARCHAR(200)
+const MOTIVO_MAX = 200;
 
-// Entero positivo: acepta 3 o "3", rechaza "abc", 1.5, -2, null
 function enteroPositivo(valor) {
   if (typeof valor === 'string' && /^\d+$/.test(valor.trim())) valor = Number(valor);
   return Number.isInteger(valor) && valor > 0 ? valor : null;
 }
 
 // GET /api/inventario/movimientos — historial de movimientos
-// Filtros opcionales: ?id_variante=1  ?id_producto=2  ?tipo=entrada|salida  ?limite=50
 router.get('/', async (req, res) => {
   const filtros = [];
   const valores = [];
@@ -78,9 +76,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/inventario/movimientos — ajuste manual de inventario
-// Body: { "id_usuario": 1, "id_variante": 3, "tipo": "salida", "cantidad": 2, "motivo": "Prenda dañada" }
-// Stock y movimiento se guardan en una sola transacción: o queda todo o no queda nada.
+// POST /api/inventario/movimientos — ajuste manual de inventario (RNF-09)
 router.post('/', async (req, res) => {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const idUsuario = enteroPositivo(body.id_usuario);
@@ -113,7 +109,6 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ error: 'Solo el personal de la tienda puede registrar movimientos' });
     }
 
-    // FOR UPDATE: bloquea la fila para que dos ajustes simultáneos no pisen el stock
     const variante = await client.query(
       'SELECT sku, stock FROM variante_producto WHERE id_variante = $1 FOR UPDATE',
       [idVariante]
@@ -142,6 +137,23 @@ router.post('/', async (req, res) => {
        RETURNING id_movimiento, fecha, tipo, cantidad, motivo, id_variante, id_usuario`,
       [tipo, cantidad, motivo, idVariante, idUsuario]
     );
+
+    // Registrar movimiento de inventario en auditoría (RNF-09)
+    await registrarAuditoria(client, {
+      id_usuario: idUsuario,
+      accion: 'CREAR',
+      entidad: 'movimiento_inventario',
+      id_entidad: movimiento.rows[0].id_movimiento,
+      detalle: {
+        tipo,
+        cantidad,
+        motivo,
+        id_variante: idVariante,
+        sku,
+        stock_anterior: stock,
+        stock_actual: nuevoStock,
+      },
+    });
 
     await client.query('COMMIT');
     res.status(201).json({
