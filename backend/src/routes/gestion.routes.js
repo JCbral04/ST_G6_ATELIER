@@ -1,6 +1,10 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
-const { getProductosConStock, getAlertasStockBajo } = require('../controllers/productoController');
+const {
+  getProductosConStock,
+  getInventario,
+  getAlertasStockBajo,
+} = require('../controllers/productoController');
 
 const router = Router();
 
@@ -8,10 +12,14 @@ const router = Router();
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones, intenta más tarde' },
 });
 
 // Rutas con rate limiting
 router.get('/productos', limiter, getProductosConStock);
+router.get('/inventario', limiter, getInventario);
 router.get('/inventario/alertas', limiter, getAlertasStockBajo);
 
 module.exports = router;

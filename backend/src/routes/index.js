@@ -10,9 +10,20 @@ router.get('/health', async (req, res) => {
     const db = await pool.query('SELECT 1 AS ok');
     res.json({ api: 'ATELIER operativa', base_de_datos: db.rows[0].ok === 1 });
   } catch (err) {
-    res.status(500).json({ api: 'ATELIER operativa', base_de_datos: false, error: err.message });
+    console.error('Error en health check:', err.message);
+    res.status(500).json({
+      api: 'ATELIER operativa',
+      base_de_datos: false,
+      status: 'error',
+      message: 'Error de conexión a la base de datos',
+    });
   }
 });
+
+// Módulos activos
+router.use('/pedidos', require('./pedido.routes'));
+router.use('/auth', require('./auth.routes'));
+router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
 
 // Rutas de gestión de información (RF-06, RF-09, RF-10)
 router.use('/', gestionRoutes);

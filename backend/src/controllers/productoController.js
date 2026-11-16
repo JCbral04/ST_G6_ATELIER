@@ -26,7 +26,39 @@ async function getProductosConStock(req, res) {
   }
 }
 
-// 2. Obtener alertas de variantes con stock bajo o igual al stock mínimo (Tarea 3 del Issue)
+// 2. Obtener listado general de inventario por variante
+async function getInventario(req, res) {
+  try {
+    const query = `
+      SELECT
+        v.id_variante,
+        v.sku,
+        v.id_producto,
+        p.nombre AS producto,
+        c.nombre AS categoria,
+        t.etiqueta AS talla,
+        col.nombre AS color,
+        col.codigo_hex,
+        p.precio,
+        v.stock,
+        p.stock_minimo
+      FROM variante_producto v
+      JOIN producto p ON v.id_producto = p.id_producto
+      JOIN categoria c ON p.id_categoria = c.id_categoria
+      JOIN talla t ON v.id_talla = t.id_talla
+      JOIN color col ON v.id_color = col.id_color
+      WHERE p.activo = TRUE
+      ORDER BY p.nombre, v.sku;
+    `;
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error al obtener inventario:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor al consultar inventario' });
+  }
+}
+
+// 3. Obtener alertas de variantes con stock bajo o igual al stock mínimo (Tarea 3 del Issue)
 async function getAlertasStockBajo(req, res) {
   try {
     const query = `
@@ -55,5 +87,6 @@ async function getAlertasStockBajo(req, res) {
 
 module.exports = {
   getProductosConStock,
-  getAlertasStockBajo
+  getInventario,
+  getAlertasStockBajo,
 };

@@ -77,6 +77,28 @@ psql -U postgres -f db/schema.sql                  # crea atelier_db, tablas, cl
 psql -U postgres -d atelier_db -f db/seed.sql      # datos iniciales de prueba
 ```
 
+#### Migraciones adicionales
+
+Después de crear el esquema y cargar los datos iniciales, aplicar las migraciones en orden:
+
+```bash
+psql -U postgres -d atelier_db -v ON_ERROR_STOP=1 \
+  -f db/migrations/001_cancelacion_venta.sql
+psql -U postgres -d atelier_db -v ON_ERROR_STOP=1 \
+  -f db/migrations/002_sesiones.sql
+```
+
+**Importante:**
+
+- Ejecutar los comandos desde la raíz del repositorio.
+- Configurar el host y puerto de PostgreSQL según el entorno.
+- La migración `001_cancelacion_venta.sql` incorpora el trigger de devolución de stock.
+- La migración `002_sesiones.sql` crea el almacenamiento de sesiones autenticadas y revocables.
+- Aplicar las migraciones antes de iniciar el backend y ejecutar las pruebas de integración.
+- No utilizar credenciales mock en producción.
+- Ejecutar las pruebas transaccionales sobre una base de datos aislada.
+
+
 ### 2. Backend (Node.js 18+)
 
 ```bash
