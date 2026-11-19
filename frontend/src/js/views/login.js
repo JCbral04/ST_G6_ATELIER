@@ -77,7 +77,7 @@
         if (pass.closest('.field').classList.contains('invalid')) validateContrasena(pass);
       });
 
-      form.addEventListener('submit', function (e) {
+      form.addEventListener('submit', async function (e) {
         e.preventDefault();
         const ok = [validateCorreo(correo), validateContrasena(pass)].every(Boolean);
         if (!ok) {
@@ -85,23 +85,26 @@
           nudge();
           return;
         }
-        // Autenticación provisional contra los usuarios del seed.
-        // La autenticación real (POST /api/auth/login, RF-01) llega en Fase 4.
-        const user = A.mock.usuarios.find(function (u) {
-          return u.correo === correo.value.trim().toLowerCase();
-        });
-        if (!user || pass.value !== '123456') {
-          formErr.textContent = 'Correo o contraseña incorrectos.';
+        // POST /api/auth/login (PR #34). Sin backend, entra en modo demo con las cuentas del seed.
+        const btn = form.querySelector('button[type=submit]');
+        btn.disabled = true;
+        btn.textContent = 'Ingresando…';
+        try {
+          const sesion = await A.api.login(correo.value.trim().toLowerCase(), pass.value);
+          form.reset();
+          setVisible(false);
+          form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
+          onSuccess(sesion);
+        } catch (err) {
+          formErr.textContent = err.message || 'No se pudo iniciar sesión.';
           pass.value = '';
           pass.closest('.field').classList.remove('valid');
           pass.focus();
           nudge();
-          return;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Ingresar';
         }
-        form.reset();
-        setVisible(false);
-        form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
-        onSuccess(user);
       });
     },
   };

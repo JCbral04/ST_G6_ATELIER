@@ -20,22 +20,13 @@
     }).join('');
   }
 
-  // Mueve el broche del metro hasta la sección activa
+  // Mueve el fondo negro hasta la sección activa
   function moverBroche() {
     const on = document.querySelector('#nav a.on');
     const slider = document.querySelector('#nav .nav-slider');
     if (!on || !slider) return;
     slider.style.width = on.offsetWidth + 'px';
     slider.style.transform = 'translateX(' + on.offsetLeft + 'px)';
-  }
-
-  // Números del metro: uno por cada rayita larga (cada 40px)
-  function numerarMetro() {
-    const cont = $('tape-num');
-    const n = Math.ceil(cont.offsetWidth / 40);
-    let html = '';
-    for (let i = 1; i <= n; i++) html += '<span style="left:' + (i * 40) + 'px">' + i + '</span>';
-    cont.innerHTML = html;
   }
 
   function updateChrome() {
@@ -89,16 +80,20 @@
     $('user-name').textContent = A.session.nombre;
     $('user-role').textContent = A.session.rol;
     renderNav();
-    numerarMetro();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
     await A.api.load();
     route();
   }
 
-  function logout() {
+  async function logout() {
+    await A.api.logout();
+    salir();
+  }
+
+  function salir() {
     A.session = null;
+    A.token = null;
     A.store.venta = [];
-    A.storage.remove('atelier.session');
     $('app').hidden = true;
     $('login').hidden = false;
     history.replaceState(null, '', location.pathname);
@@ -108,18 +103,26 @@
   A.app = {
     refresh: function () { if (current) show(current); },
     can: function (view) { return !!A.session && A.views[view].roles.indexOf(A.session.rol) !== -1; },
+    // Token vencido o revocado: volver al login con un aviso
+    sesionVencida: function () {
+      if (!A.session) return;
+      A.api.logout();
+      salir();
+      document.getElementById('login-error').textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
+    },
   };
 
   document.addEventListener('DOMContentLoaded', function () {
-    A.login.init(function (user) {
-      A.session = user;
-      A.storage.set('atelier.session', user);
+    A.login.init(function (sesion) {
+      A.session = sesion.usuario;
+      A.token = sesion.token;
+      A.api.guardarSesion({ usuario: sesion.usuario, token: sesion.token });
       enterApp();
     });
 
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
-    window.addEventListener('resize', function () { if (A.session) { numerarMetro(); moverBroche(); } });
+    window.addEventListener('resize', function () { if (A.session) moverBroche(); });
     // Las fuentes cambian el ancho de las secciones: recolocar el broche cuando carguen
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (A.session) moverBroche(); });
     // Los avisos de "por reponer" abren el inventario ya filtrado
@@ -128,14 +131,15 @@
       if (current === 'inventario') A.app.refresh();
     });
 
-    // Recuperar sesión de la pestaña (solo datos públicos del usuario, nunca la contraseña)
-    const saved = A.storage.get('atelier.session');
-    const valid = saved && A.mock.usuarios.find(function (u) { return u.correo === saved.correo; });
-    if (valid) {
-      A.session = valid;
-      enterApp();
-    } else {
-      $('login').hidden = false;
-    }
+    // Recuperar la sesión de la pestaña (usuario y token, nunca la contraseña)
+    A.api.recuperarSesion().then(function (s) {
+      if (s) {
+        A.session = s.usuario;
+        A.token = s.token || null;
+        enterApp();
+      } else {
+        $('login').hidden = false;
+      }
+    });
   });
 })(window.Atelier);

@@ -27,6 +27,7 @@
       const totalHoy = ventasHoy.reduce(function (t, p) { return t + p.total; }, 0);
       const promedio = ventasHoy.length ? Math.round(totalHoy / ventasHoy.length) : 0;
       const porRecibir = s.compras.filter(function (c) { return c.estado === 'pendiente'; });
+      const esAdmin = A.session && A.session.rol === 'administrador';
       const ultimas = s.pedidos.slice().sort(function (a, b) { return new Date(b.fecha) - new Date(a.fecha); }).slice(0, 5);
 
       return `
@@ -71,11 +72,17 @@
 
         <section>
           <h3 class="sec">Últimas ventas</h3>
-          ${ultimas.length ? `<div class="tiquetes">${ultimas.map(function (p) {
-            return `<article class="tiquete">
+          ${ultimas.length ? `<div class="tiquetes" id="tiquetes">${ultimas.map(function (p) {
+            const anulada = p.estado === 'cancelado';
+            const anulable = esAdmin && ['pendiente', 'confirmado'].indexOf(p.estado) !== -1;
+            return `<article class="tiquete ${anulada ? 'anulado' : ''}">
               <div class="tiquete-fila"><b>Pedido ${esc(p.id_pedido)}</b><span>${esc(A.hora(p.fecha))}</span></div>
-              <div class="tiquete-fila sub"><span>${esc(p.usuario)}</span><span class="pill ${p.estado === 'cancelado' ? 'pill-warn' : 'pill-ok'}">${esc(p.estado)}</span></div>
-              <div class="tiquete-total">${fmt(p.total)}</div>
+              <div class="tiquete-fila sub"><span>${esc(p.usuario)}</span><span class="pill ${anulada ? 'pill-warn' : 'pill-ok'}">${anulada ? 'anulada' : esc(p.estado)}</span></div>
+              <div class="remision-pie">
+                ${anulable ? `<span class="anular" data-anular="${esc(p.id_pedido)}">
+                  <button type="button" class="link-btn oscuro" data-paso="pedir">Anular venta</button></span>` : '<span></span>'}
+                <span class="tiquete-total">${fmt(p.total)}</span>
+              </div>
             </article>`;
           }).join('')}</div>` : '<div class="empty">Todavía no hay ventas. Regístralas desde Vender.</div>'}
         </section>
@@ -85,6 +92,34 @@
     bind(root) {
       const link = root.querySelector('[data-reponer]');
       if (link) link.addEventListener('click', function () { A.views.inventario.soloPorReponer(); });
+
+      // Anular venta (solo administrador): pide confirmación en el mismo tiquete
+      const lista = root.querySelector('#tiquetes');
+      if (!lista) return;
+      lista.addEventListener('click', async function (e) {
+        const b = e.target.closest('button[data-paso]');
+        if (!b) return;
+        const caja = b.closest('[data-anular]');
+        const id = Number(caja.dataset.anular);
+        if (b.dataset.paso === 'pedir') {
+          caja.innerHTML = `<span class="confirma">¿Anular y devolver el stock?
+            <button type="button" class="btn-mini peligro" data-paso="si">Sí, anular</button>
+            <button type="button" class="link-btn oscuro" data-paso="no">No</button></span>`;
+          caja.querySelector('[data-paso="si"]').focus();
+        } else if (b.dataset.paso === 'no') {
+          caja.innerHTML = '<button type="button" class="link-btn oscuro" data-paso="pedir">Anular venta</button>';
+        } else if (b.dataset.paso === 'si') {
+          b.disabled = true;
+          try {
+            await A.api.cancelarVenta(id);
+            A.toast('<b>Venta ' + esc(id) + ' anulada.</b> Las prendas volvieron al inventario.');
+            A.app.refresh();
+          } catch (err) {
+            b.disabled = false;
+            A.toast('<b>No se pudo anular la venta.</b> ' + esc(err.message));
+          }
+        }
+      });
     },
   };
 })(window.Atelier);

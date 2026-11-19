@@ -46,26 +46,39 @@
       { id_variante: 11, sku: 'CHA-NEG-L', id_producto: 3, producto: 'Chaqueta denim', categoria: 'Chaquetas', talla: 'L', color: 'Negro', codigo_hex: '#000000', precio: 199900, stock: 0, imagen: 'src/img/prendas/chaqueta-negra.webp', stock_minimo: 3 },
     ],
 
-    // Misma forma que GET /api/pedidos (PR #11)
+    // Misma forma que GET /api/pedidos (PR #11). `items` solo se usa en demo para anular.
     pedidos: [
-      { id_pedido: 1, fecha: hoyALas(9, 12), estado: 'confirmado', total: 90000, usuario: 'Vendedor de prueba' },
+      { id_pedido: 1, fecha: hoyALas(9, 12), estado: 'confirmado', total: 90000, usuario: 'Vendedor de prueba',
+        items: [{ id_variante: 1, cantidad: 2 }] },
       // Solo demo: más ventas de hoy para que el resumen muestre varios tiquetes.
-      { id_pedido: 2, fecha: hoyALas(10, 47), estado: 'confirmado', total: 199900, usuario: 'Admin ATELIER' },
-      { id_pedido: 3, fecha: hoyALas(11, 20), estado: 'pendiente', total: 174900, usuario: 'Vendedor de prueba' },
+      { id_pedido: 2, fecha: hoyALas(10, 47), estado: 'confirmado', total: 199900, usuario: 'Admin ATELIER',
+        items: [{ id_variante: 4, cantidad: 1 }] },
+      { id_pedido: 3, fecha: hoyALas(11, 20), estado: 'pendiente', total: 174900, usuario: 'Vendedor de prueba',
+        items: [{ id_variante: 1, cantidad: 1 }, { id_variante: 3, cantidad: 1 }] },
     ],
 
     // Forma esperada de GET /api/compras
     compras: [
       { id_compra: 1, fecha: '2026-10-15T10:00:00', estado: 'recibida', total: 700000, proveedor: 'Textiles del Norte S.A.S.',
-        items: [{ sku: 'CAM-NEG-M', cantidad: 20, costo_unitario: 35000 }] },
-      { id_compra: 2, fecha: '2026-10-17T15:30:00', estado: 'pendiente', total: 900000, proveedor: 'Moda Premium Ltda.',
-        items: [{ sku: 'CAM-ROJ-S', cantidad: 20, costo_unitario: 45000 }] },
+        items: [{ id_variante: 1, sku: 'CAM-NEG-M', cantidad: 20, costo_unitario: 35000 }] },
+      { id_compra: 2, fecha: '2026-10-17T15:30:00', estado: 'pendiente', total: 480000, proveedor: 'Moda Premium Ltda.',
+        items: [{ id_variante: 5, sku: 'CAM-ROJ-S', cantidad: 20, costo_unitario: 24000 }] },
     ],
 
     // Forma esperada de GET /api/proveedores
     proveedores: [
       { id_proveedor: 1, nombre: 'Textiles del Norte S.A.S.', contacto: 'Carlos Ríos', correo: 'ventas@textilesnorte.co', telefono: '311 745 8890' },
       { id_proveedor: 2, nombre: 'Moda Premium Ltda.', contacto: 'Andrea Salazar', correo: 'comercial@modapremium.co', telefono: '322 312 6677' },
+    ],
+
+    // Misma forma que GET /api/inventario/movimientos (PR #30)
+    movimientos: [
+      { id_movimiento: 3, fecha: hoyALas(8, 5), tipo: 'salida', cantidad: 1, motivo: 'Prenda dañada en vitrina', usuario: 'Admin ATELIER',
+        id_variante: 2, sku: 'CAM-BLA-M', producto: 'Camiseta básica algodón', talla: 'M', color: 'Blanco' },
+      { id_movimiento: 2, fecha: '2026-10-18T09:12:00', tipo: 'salida', cantidad: 2, motivo: 'Venta pedido #1', usuario: 'Vendedor de prueba',
+        id_variante: 1, sku: 'CAM-NEG-M', producto: 'Camiseta básica algodón', talla: 'M', color: 'Negro' },
+      { id_movimiento: 1, fecha: '2026-10-15T10:00:00', tipo: 'entrada', cantidad: 20, motivo: 'Compra #1 recibida - Textiles del Norte', usuario: 'Admin ATELIER',
+        id_variante: 1, sku: 'CAM-NEG-M', producto: 'Camiseta básica algodón', talla: 'M', color: 'Negro' },
     ],
   };
 })(window.Atelier);

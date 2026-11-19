@@ -230,7 +230,7 @@
         } else if (t.id === 'checkout') {
           t.disabled = true;
           try {
-            const r = await A.api.registrarVenta(A.session.id_usuario, items);
+            const r = await A.api.registrarVenta(items);
             A.store.venta = [];
             // El ticket se "corta" y sale volando antes de empezar una venta nueva
             if (!sinMovimiento) {

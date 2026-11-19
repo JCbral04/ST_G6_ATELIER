@@ -14,11 +14,11 @@ React queda para la Fase 4.
 
 | Ruta | Pantalla | Roles | Requisitos |
 |---|---|---|---|
-| — | Acceso del personal con validación visual de campos obligatorios | administrador, vendedor | RF-01 (provisional) |
+| — | Acceso del personal contra `POST /api/auth/login`; sin backend entra en modo demo | administrador, vendedor | RF-01 |
 | `#/pos` | **Vista principal.** Venta en mostrador: prendas, cantidades y confirmación contra `POST /api/pedidos` | administrador, vendedor | RF-11, RF-12 |
-| `#/dashboard` | Resumen: ventas del día, últimas ventas y variantes por reponer | administrador, vendedor | RF-10 |
-| `#/inventario` | Existencias por variante (SKU, talla, color, stock y mínimo) con filtros por categoría, talla, color y estado | administrador, vendedor | RF-06, RF-07, RF-09, RF-10 |
-| `#/compras` | Órdenes de compra y directorio de proveedores | administrador | RF-16..18 |
+| `#/dashboard` | Resumen: ventas del día, últimas ventas y variantes por reponer. El administrador puede anular una venta | administrador, vendedor | RF-10, #25 |
+| `#/inventario` | Fichas talla × color, lista por variante y movimientos (ajustes manuales e historial), con filtros por categoría, talla, color y estado | administrador, vendedor | RF-06, RF-07, RF-09, RF-10, #26 |
+| `#/compras` | Pedir al proveedor (armar y enviar órdenes de compra), órdenes por recibir/recibidas y directorio | administrador | RF-16..18 |
 
 La interfaz es responsive (RNF-06): en celular la navegación lateral pasa a un menú
 desplegable (☰) y las tablas se desplazan horizontalmente.
@@ -52,9 +52,31 @@ de `src/js/data.js` (espejo del seed). El indicador del encabezado muestra
 | Recurso | Endpoint esperado | Estado |
 |---|---|---|
 | Variantes con stock | `GET /api/inventario` | pendiente (PR #15) |
-| Pedidos | `GET /api/pedidos`, `POST /api/pedidos` | PR #11 |
-| Compras | `GET /api/compras`, `PATCH /api/compras/:id` | Fase 4 |
-| Proveedores | `GET /api/proveedores` | Fase 4 |
+| Sesión | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` | PR #34 |
+| Pedidos | `GET /api/pedidos`, `POST /api/pedidos`, `POST /api/pedidos/:id/cancelar` | PR #11 y #34 |
+| Movimientos | `GET /api/inventario/movimientos`, `POST /api/inventario/movimientos` | PR #30 |
+| Compras | `GET /api/compras`, `POST /api/compras`, `PATCH /api/compras/:id` | pendiente (backend) |
+| Proveedores | `GET /api/proveedores` | pendiente (backend) |
+
+Todas las peticiones llevan `Authorization: Bearer <token>` cuando hay sesión real. Si la API
+responde 401 (token vencido o revocado), el panel vuelve al login.
+
+Forma que espera el panel para las compras:
+
+```json
+// GET /api/compras
+[{ "id_compra": 2, "fecha": "2026-10-17T15:30:00Z", "estado": "pendiente", "total": 480000,
+   "proveedor": "Moda Premium Ltda.",
+   "items": [{ "id_variante": 5, "sku": "CAM-ROJ-S", "cantidad": 20, "costo_unitario": 24000 }] }]
+
+// POST /api/compras  (body)
+{ "id_proveedor": 2, "items": [{ "id_variante": 6, "cantidad": 7, "costo_unitario": 60000 }] }
+// respuesta 201
+{ "id_compra": 3, "total": 420000, "estado": "pendiente" }
+
+// PATCH /api/compras/:id  (body)  -> dispara trg_stock_compra
+{ "estado": "recibida" }
+```
 
 Forma de cada fila de `GET /api/inventario` (la que espera la interfaz):
 
