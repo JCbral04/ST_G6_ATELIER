@@ -24,4 +24,7 @@ router.use('/pedidos', require('./pedido.routes'));
 router.use('/auth', require('./auth.routes'));
 router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
 
+//Microservicio de IA
+router.use('/ia', require('./ia.routes'));
+
 module.exports = router;

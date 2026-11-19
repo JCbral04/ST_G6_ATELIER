@@ -140,3 +140,14 @@ El proyecto se desarrolla bajo el modelo de ciclo de vida en cascada (SDLC):
 - **Steven Rusinque Gutierrez**
 
 Universidad Manuela Beltrán — Grupo 6
+
+## Inteligencia artificial
+
+ATELIER incorpora un microservicio de predicción de demanda
+y reposición inteligente de inventario basado en FastAPI
+y Scikit-learn.
+
+- [Documentación técnica e instalación](ai-service/README.md)
+- Panel administrativo: `/ia.html`
+- Endpoint protegido: `POST /api/ia/reposicion`
+- Pruebas automatizadas: `ai-service/tests/`
