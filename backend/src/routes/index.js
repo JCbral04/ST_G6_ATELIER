@@ -24,4 +24,7 @@ router.use('/auth', require('./auth.routes'));
 router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
 router.use('/auditoria', require('./auditoria.routes')); // Issue #27 (RNF-09)
 
+//Microservicio de IA
+router.use('/ia', require('./ia.routes'));
+
 module.exports = router;
