@@ -10,6 +10,7 @@
   let current = null;
 
   function allowed() {
+    if (!A.session) return [];
     return ORDER.filter(function (k) { return A.views[k].roles.indexOf(A.session.rol) !== -1; });
   }
 
@@ -32,19 +33,19 @@
   function updateChrome() {
     const low = A.store.variantes.filter(A.isLow).length;
     $('low-count').textContent = low;
-    const canInv = A.app.can('inventario');
-    $('bell').hidden = !canInv;
+    // Sin inventario real no se puede afirmar cuánto hay por reponer
+    $('bell').hidden = !A.app.can('inventario') || !A.api.disponible('variantes');
     const src = A.api.sourceLabel();
     const pill = $('data-source');
     pill.textContent = src.text;
     pill.className = 'pill ' + src.cls;
-    pill.title = A.store.apiOnline
-      ? 'API conectada. Los recursos sin endpoint usan datos de respaldo.'
-      : 'API no disponible: se muestran datos de prueba del seed.';
+    pill.title = src.title;
+    $('demo-banner').hidden = !A.api.esDemo();
   }
 
   function show(view) {
     const list = allowed();
+    if (!list.length) return;
     if (list.indexOf(view) === -1) view = list[0];
     current = view;
     const v = A.views[view];
@@ -74,14 +75,26 @@
     show(location.hash.replace(/^#\/?/, '') || 'pos');
   }
 
-  async function enterApp() {
+  async function enterApp(sesion) {
+    A.api.iniciar(sesion);
+    // Defensa extra: un rol sin vistas no entra al panel
+    if (!allowed().length) {
+      await logout();
+      $('login-error').textContent = 'Tu cuenta no tiene acceso al panel de la tienda.';
+      return;
+    }
     $('login').hidden = true;
     $('app').hidden = false;
     $('user-name').textContent = A.session.nombre;
     $('user-role').textContent = A.session.rol;
+    $('demo-banner').hidden = !A.api.esDemo();
     renderNav();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
-    await A.api.load();
+    try {
+      await A.api.load();
+    } catch (e) {
+      return;   // la sesión venció mientras cargaba: ya está en el login
+    }
     route();
   }
 
@@ -91,34 +104,28 @@
   }
 
   function salir() {
-    A.session = null;
-    A.token = null;
-    A.store.venta = [];
+    current = null;
     $('app').hidden = true;
     $('login').hidden = false;
+    $('screen').replaceChildren();
     history.replaceState(null, '', location.pathname);
     $('correo').focus();
   }
 
   A.app = {
-    refresh: function () { if (current) show(current); },
+    refresh: function () { if (current && A.session) show(current); },
     can: function (view) { return !!A.session && A.views[view].roles.indexOf(A.session.rol) !== -1; },
-    // Token vencido o revocado: volver al login con un aviso
+    // Token vencido o revocado: volver al login con un aviso, sin pasar a demo
     sesionVencida: function () {
       if (!A.session) return;
-      A.api.logout();
+      A.api.olvidarSesion();
       salir();
-      document.getElementById('login-error').textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
+      $('login-error').textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
     },
   };
 
   document.addEventListener('DOMContentLoaded', function () {
-    A.login.init(function (sesion) {
-      A.session = sesion.usuario;
-      A.token = sesion.token;
-      A.api.guardarSesion({ usuario: sesion.usuario, token: sesion.token });
-      enterApp();
-    });
+    A.login.init(enterApp);
 
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
@@ -133,13 +140,11 @@
 
     // Recuperar la sesión de la pestaña (usuario y token, nunca la contraseña)
     A.api.recuperarSesion().then(function (s) {
-      if (s) {
-        A.session = s.usuario;
-        A.token = s.token || null;
-        enterApp();
-      } else {
-        $('login').hidden = false;
-      }
+      if (s) enterApp(s);
+      else $('login').hidden = false;
+    }, function (err) {
+      $('login').hidden = false;
+      $('login-error').textContent = err.message;
     });
   });
 })(window.Atelier);

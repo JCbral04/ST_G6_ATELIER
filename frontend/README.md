@@ -14,7 +14,7 @@ React queda para la Fase 4.
 
 | Ruta | Pantalla | Roles | Requisitos |
 |---|---|---|---|
-| — | Acceso del personal contra `POST /api/auth/login`; sin backend entra en modo demo | administrador, vendedor | RF-01 |
+| — | Acceso del personal contra `POST /api/auth/login`, o modo demo elegido a propósito | administrador, vendedor | RF-01 |
 | `#/pos` | **Vista principal.** Venta en mostrador: prendas, cantidades y confirmación contra `POST /api/pedidos` | administrador, vendedor | RF-11, RF-12 |
 | `#/dashboard` | Resumen: ventas del día, últimas ventas y variantes por reponer. El administrador puede anular una venta | administrador, vendedor | RF-10, #25 |
 | `#/inventario` | Fichas talla × color, lista por variante y movimientos (ajustes manuales e historial), con filtros por categoría, talla, color y estado | administrador, vendedor | RF-06, RF-07, RF-09, RF-10, #26 |
@@ -34,32 +34,51 @@ cd backend && npm run dev
 
 Express sirve esta carpeta como estática, así que la interfaz y la API comparten origen.
 
-**Sin backend (modo demo):** abrir `frontend/index.html` en el navegador, o servir la carpeta:
+**Sin backend (modo demo):** abrir `frontend/index.html` en el navegador, o servir la carpeta, y
+entrar con **Probar en modo demo**:
 
 ```bash
 cd frontend && python3 -m http.server 8080   # http://localhost:8080
 ```
 
 Cuentas de prueba del personal, contraseña `123456`: `admin@atelier.com` y
-`vendedor@atelier.com`. También aparecen en el login para llenarlo con un clic.
+`vendedor@atelier.com`. También aparecen en el login para llenarlo con un clic. Solo entran
+los roles `administrador` y `vendedor`; cualquier otro rol (por ejemplo el legado `cliente`)
+se rechaza al iniciar o recuperar la sesión.
 
-## Datos: API real o modo demo
+## Datos: sesión real o modo demo
 
-`src/js/api.js` consulta cada recurso en la API; si el endpoint aún no existe usa los datos
-de `src/js/data.js` (espejo del seed). El indicador del encabezado muestra
-**Conectado a la base de datos**, **Conexión parcial (n de 4)** o **Datos de prueba**.
+Son dos modos separados y nunca se mezclan (`src/js/api.js`):
 
-| Recurso | Endpoint esperado | Estado |
-|---|---|---|
-| Variantes con stock | `GET /api/inventario` | pendiente (PR #15) |
-| Sesión | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` | PR #34 |
-| Pedidos | `GET /api/pedidos`, `POST /api/pedidos`, `POST /api/pedidos/:id/cancelar` | PR #11 y #34 |
-| Movimientos | `GET /api/inventario/movimientos`, `POST /api/inventario/movimientos` | PR #30 |
-| Compras | `GET /api/compras`, `POST /api/compras`, `PATCH /api/compras/:id` | pendiente (backend) |
-| Proveedores | `GET /api/proveedores` | pendiente (backend) |
+- **Sesión real** (botón *Ingresar*): todo sale de la API y cada petición lleva
+  `Authorization: Bearer <token>`. Si un recurso no carga (404, 403, 500, sin conexión o
+  respuesta con otro formato) queda vacío y marcado como no disponible; **no** se reemplaza
+  por datos de prueba. Las operaciones que dependen de él se desactivan y la pantalla explica
+  por qué. Si el servidor no responde al iniciar sesión, el login lo dice y no entra solo a demo.
+  Si la API responde 401 (token vencido o revocado), el panel vuelve al login.
+- **Modo demo** (botón *Probar en modo demo*): usa solo `src/js/data.js` en memoria y no hace
+  ninguna petición a la API, aunque el servidor esté encendido. Una franja arriba del contenido
+  y el indicador del encabezado avisan que nada se guarda.
 
-Todas las peticiones llevan `Authorization: Bearer <token>` cuando hay sesión real. Si la API
-responde 401 (token vencido o revocado), el panel vuelve al login.
+El indicador del encabezado muestra **Conectado a la base de datos**, **Conexión parcial (n de m)**
+(con el detalle de lo que falta al pasar el cursor) o **Modo demo: no se guarda**.
+
+| Recurso | Endpoint | Estado | Sin él, en sesión real |
+|---|---|---|---|
+| Variantes con stock | `GET /api/inventario` | pendiente (PR #15) | ventas, ajustes y pedidos a proveedores desactivados |
+| Sesión | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` | PR #34 | no se puede entrar (solo demo) |
+| Pedidos | `GET /api/pedidos`, `POST /api/pedidos`, `POST /api/pedidos/:id/cancelar` | PR #11 y #34 | resumen de ventas y anulación sin datos |
+| Movimientos | `GET /api/inventario/movimientos`, `POST /api/inventario/movimientos` | PR #30; autenticación en PR #37 | historial y ajustes sin datos |
+| Compras | `GET /api/compras`, `POST /api/compras`, `PATCH /api/compras/:id` | PR #44 | órdenes desactivadas |
+| Proveedores | `GET /api/proveedores` | PR #44 | pedidos a proveedores desactivados |
+
+**Ajustes manuales:** el navegador ya no envía `id_usuario`; el servidor debe tomar el usuario del
+token. Mientras la ruta de movimientos responda sin token (antes de #37), el panel deja el registro
+real de ajustes desactivado. Lo comprueba pidiendo el historial sin `Authorization`: si responde
+401, la ruta está protegida y el formulario se activa.
+
+**Reponer en compras:** el botón *Completar al doble del mínimo* es una regla fija del panel
+(`stock_minimo × 2 − stock − en camino`), no la predicción del microservicio de IA.
 
 Forma que espera el panel para las compras:
 
@@ -98,8 +117,8 @@ frontend/
     ├── fonts/            # Bricolage Grotesque y Hanken Grotesk (OFL), sin depender de internet
     └── js/
         ├── utils.js      # formato de moneda, escape HTML, toast, sesión
-        ├── data.js       # datos de respaldo (modo demo)
-        ├── api.js        # carga desde la API con respaldo
+        ├── data.js       # datos de prueba (solo modo demo)
+        ├── api.js        # sesión real o demo, carga y validación de la API
         ├── app.js        # sesión, roles, navegación y router por hash
         └── views/        # login, pos, dashboard, inventario, compras
 ```

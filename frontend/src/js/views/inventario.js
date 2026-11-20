@@ -122,15 +122,22 @@
 
   // Vista de movimientos: registrar un ajuste manual + historial (PR #30)
   function movimientosHtml() {
+    const invOk = A.api.disponible('variantes');
     const ids = filtrar().map(function (v) { return v.id_variante; });
+    // Sin inventario no hay con qué filtrar: se muestra todo el historial
     const hist = A.store.movimientos
-      .filter(function (m) { return ids.indexOf(Number(m.id_variante)) !== -1; })
+      .filter(function (m) { return !invOk || ids.indexOf(Number(m.id_variante)) !== -1; })
       .sort(function (a, b) { return new Date(b.fecha) - new Date(a.fecha) || b.id_movimiento - a.id_movimiento; })
       .slice(0, 60);
     const v = A.store.variantes.find(function (x) { return x.id_variante === Number(ajuste.id_variante); });
 
+    const puede = A.api.puede('ajustar');
+
     return `<div class="mov-cols">
-      <form class="orden ajuste" id="ajuste" novalidate>
+      ${!puede.ok ? `<section class="orden ajuste">
+        <h3>Registrar ajuste</h3>
+        ${A.noDisponible('Los ajustes están desactivados.', puede.motivo)}
+      </section>` : `<form class="orden ajuste" id="ajuste" novalidate>
         <h3>Registrar ajuste</h3>
         <p class="orden-ayuda">Para entradas o salidas que no son ventas ni compras: daños, pérdidas, conteos o devoluciones.</p>
         <label class="orden-campo">Prenda
@@ -158,11 +165,12 @@
         }).join('')}</div>
         <p class="form-error" id="ajuste-error" role="alert"></p>
         <button type="submit" class="btn btn-block">Registrar ${ajuste.tipo === 'entrada' ? 'entrada' : 'salida'}</button>
-      </form>
+        ${A.api.esDemo() ? '<p class="regla-fija">Modo demo: el ajuste se simula y no se guarda.</p>' : ''}
+      </form>`}
 
       <section>
         <h3 class="sec">Historial de movimientos</h3>
-        ${hist.length ? `<ol class="historial">${hist.map(function (m) {
+        ${!A.api.disponible('movimientos') ? A.noDisponible('No se pudo cargar el historial.', A.frase(A.api.motivo('movimientos'))) : hist.length ? `<ol class="historial">${hist.map(function (m) {
           const x = A.store.variantes.find(function (y) { return y.id_variante === Number(m.id_variante); }) || m;
           return `<li class="mov mov-${esc(m.tipo)}">
             ${A.prenda.de(x, 'inv-thumb')}
@@ -178,8 +186,9 @@
   }
 
   function resultadosHtml() {
-    if (vista === 'lista') return tablaHtml();
     if (vista === 'movimientos') return movimientosHtml();
+    if (!A.api.disponible('variantes')) return '';   // el aviso ya está arriba
+    if (vista === 'lista') return tablaHtml();
     return fichasHtml();
   }
 
@@ -200,8 +209,9 @@
       };
 
       return `
-      <p class="inv-resumen"><b>${unidades.toLocaleString('es-CO')}</b> unidades en bodega en <b>${all.length}</b> variantes.
-        ${bajos ? `<b class="violeta">${bajos} por reponer.</b>` : 'Nada por reponer.'}</p>
+      ${A.api.disponible('variantes') ? `<p class="inv-resumen"><b>${unidades.toLocaleString('es-CO')}</b> unidades en bodega en <b>${all.length}</b> variantes.
+        ${bajos ? `<b class="violeta">${bajos} por reponer.</b>` : 'Nada por reponer.'}</p>`
+        : `<div class="inv-resumen">${A.noDisponible('No se pudo cargar el inventario.', A.frase(A.api.motivo('variantes')) + ' No se muestran datos de prueba en una sesión real.')}</div>`}
 
       <form class="inv-tools" id="inv-filters" role="search">
         <input class="search" id="f-q" name="q" type="search" placeholder="Busca por nombre o SKU" value="${esc(f.q)}" aria-label="Buscar">
@@ -277,14 +287,17 @@
         const btn = e.target.querySelector('[type=submit]');
         btn.disabled = true;
         try {
-          await A.api.registrarMovimiento({ id_variante: Number(ajuste.id_variante), tipo: ajuste.tipo, cantidad: cantidad, motivo: motivo });
-          const v = A.store.variantes.find(function (x) { return x.id_variante === Number(ajuste.id_variante); });
-          A.toast('<b>' + (ajuste.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' registrada.</b> ' + esc(v ? v.sku : '') + ' ahora tiene ' + esc(v ? v.stock : '') + ' en bodega.');
+          const r = await A.api.registrarMovimiento({ id_variante: Number(ajuste.id_variante), tipo: ajuste.tipo, cantidad: cantidad, motivo: motivo });
+          // El stock del mensaje es el que devuelve la API (stock_actual), no el de la pantalla
+          const sku = r.sku || ((A.store.variantes.find(function (x) { return x.id_variante === Number(ajuste.id_variante); }) || {}).sku || '');
+          A.toast('<b>' + (ajuste.tipo === 'entrada' ? 'Entrada' : 'Salida') + (r.demo ? ' simulada.' : ' registrada.') + '</b> ' +
+            esc(sku) + ' ahora tiene ' + esc(r.stock_actual) + ' en bodega.' + (r.demo ? ' Es modo demo: no se guardó.' : ''));
           ajuste = { id_variante: ajuste.id_variante, tipo: ajuste.tipo, cantidad: '', motivo: '' };
           A.app.refresh();
         } catch (ex) {
+          if (ex.vencida) return;
           btn.disabled = false;
-          err(ex.status === 422 ? 'No hay suficiente stock para esa salida. ' + ex.message : 'No se pudo registrar el ajuste. ' + ex.message);
+          err(ex.status === 422 ? 'No hay suficiente stock para esa salida. ' + A.frase(ex.message) : 'No se pudo registrar el ajuste. ' + A.frase(ex.message));
         }
       });
     },

@@ -77,33 +77,57 @@
         if (pass.closest('.field').classList.contains('invalid')) validateContrasena(pass);
       });
 
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault();
+      function camposOk() {
         const ok = [validateCorreo(correo), validateContrasena(pass)].every(Boolean);
         if (!ok) {
           (form.querySelector('.invalid input') || correo).focus();
           nudge();
-          return;
         }
-        // POST /api/auth/login (PR #34). Sin backend, entra en modo demo con las cuentas del seed.
+        return ok;
+      }
+      function entrar(sesion) {
+        form.reset();
+        setVisible(false);
+        formErr.textContent = '';
+        form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
+        onSuccess(sesion);
+      }
+      function fallo(err) {
+        formErr.textContent = err.message || 'No se pudo iniciar sesión.';
+        pass.value = '';
+        pass.closest('.field').classList.remove('valid');
+        pass.focus();
+        nudge();
+      }
+
+      // Sesión real: POST /api/auth/login (PR #34). Si no hay servidor, no entra
+      // en demo por su cuenta: lo dice y la persona decide.
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (!camposOk()) return;
         const btn = form.querySelector('button[type=submit]');
         btn.disabled = true;
         btn.textContent = 'Ingresando…';
         try {
-          const sesion = await A.api.login(correo.value.trim().toLowerCase(), pass.value);
-          form.reset();
-          setVisible(false);
-          form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
-          onSuccess(sesion);
+          entrar(await A.api.login(correo.value.trim().toLowerCase(), pass.value));
         } catch (err) {
-          formErr.textContent = err.message || 'No se pudo iniciar sesión.';
-          pass.value = '';
-          pass.closest('.field').classList.remove('valid');
-          pass.focus();
-          nudge();
+          fallo(err);
         } finally {
           btn.disabled = false;
           btn.textContent = 'Ingresar';
+        }
+      });
+
+      // Modo demo explícito: datos de prueba, sin ninguna petición a la API
+      document.getElementById('demo-btn').addEventListener('click', function () {
+        if (!camposOk()) {
+          formErr.textContent = 'Para el modo demo elige una de las cuentas de prueba de arriba.';
+          return;
+        }
+        try {
+          entrar(A.api.loginDemo(correo.value.trim().toLowerCase(), pass.value));
+        } catch (err) {
+          fallo(err);
         }
       });
     },

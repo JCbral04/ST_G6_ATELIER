@@ -53,6 +53,9 @@
             <li><button type="button" data-demo="admin@atelier.com">admin@atelier.com</button></li>
             <li><button type="button" data-demo="vendedor@atelier.com">vendedor@atelier.com</button></li>
           </ul>
+          <p class="stub-demo">¿Solo quieres ver cómo funciona?
+            <button type="button" id="demo-btn">Probar en modo demo</button>
+            <small>Usa datos de prueba y no guarda nada en la base de datos.</small></p>
         </div>
       </form>
     </div>
@@ -76,6 +79,9 @@
     </header>
 
     <main id="main">
+      <p id="demo-banner" class="demo-banner" role="status" hidden>
+        <b>Modo demo.</b> Estás viendo datos de prueba. Nada de lo que hagas aquí se guarda en la base de datos.
+      </p>
       <div class="topbar">
         <h2 id="view-title">Punto de venta</h2>
         <span id="data-source" class="pill pill-muted">—</span>

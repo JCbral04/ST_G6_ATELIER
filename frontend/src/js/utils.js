@@ -44,6 +44,18 @@ window.Atelier = window.Atelier || { views: {} };
     t._h = setTimeout(function () { t.classList.remove('show'); }, 4000);
   };
 
+  // Mensaje de error como frase: con mayúscula inicial y punto final
+  A.frase = function (msg) {
+    const m = String(msg || '').trim();
+    if (!m) return '';
+    return m.charAt(0).toUpperCase() + m.slice(1) + (/[.!?]$/.test(m) ? '' : '.');
+  };
+
+  // Aviso de algo que no se puede usar en la sesión actual (sesión real sin ese dato)
+  A.noDisponible = function (titulo, detalle) {
+    return '<div class="no-disponible" role="note"><b>' + A.esc(titulo) + '</b>' + A.esc(detalle || '') + '</div>';
+  };
+
   // sessionStorage puede fallar (modo privado, file://): siempre con try/catch
   A.storage = {
     get: function (k) {

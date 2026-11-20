@@ -5,6 +5,9 @@
    - Órdenes de compra: lo que viene en camino y lo que ya llegó;
      "Recibir mercancía" suma el stock (PATCH /api/compras/:id)
    - Directorio de proveedores
+   En sesión real todo depende de GET /api/compras, /api/proveedores e
+   /api/inventario (PR #44 y #15); si alguno falta, la parte que lo usa
+   se desactiva y se explica por qué. En modo demo se simula.
    ============================================================= */
 (function (A) {
   'use strict';
@@ -43,7 +46,8 @@
     return '';
   }
 
-  // Sugerencia: llegar al doble del mínimo, descontando lo que ya viene en camino.
+  // Regla fija del panel (no es la predicción del servicio de IA):
+  // llegar al doble del mínimo, descontando lo que ya viene en camino.
   // Si lo que viene en camino ya alcanza, la sugerencia es 0 y no se agrega.
   function sugerido(v) {
     return Math.max(0, v.stock_minimo * 2 - v.stock - enCamino(v.id_variante));
@@ -102,6 +106,13 @@
 
   function ordenHtml() {
     const s = A.store;
+    const puede = A.api.puede('comprar');
+    if (!puede.ok) {
+      return `<section class="orden" aria-labelledby="orden-titulo">
+        <h3 id="orden-titulo">Pedir al proveedor</h3>
+        ${A.noDisponible('Los pedidos a proveedores están desactivados.', puede.motivo + ' Las órdenes solo se arman con prendas y proveedores reales.')}
+      </section>`;
+    }
     const bajos = porPedir();
     return `
     <section class="orden" aria-labelledby="orden-titulo">
@@ -121,8 +132,9 @@
         <select id="orden-prenda" aria-label="Prenda para agregar">
           <option value="">Agregar una prenda…</option>${opcionesPrendas()}
         </select>
-        <button type="button" class="btn-mini" id="orden-reponer" ${bajos.length ? '' : 'disabled'}>
-          Agregar lo que hay que reponer (${bajos.length})</button>
+        <button type="button" class="btn-mini" id="orden-reponer" ${bajos.length ? '' : 'disabled'}
+          title="Regla fija: completa hasta el doble del stock mínimo">
+          Completar al doble del mínimo (${bajos.length})</button>
       </div>
 
       <div id="orden-lineas">${lineasHtml()}</div>
@@ -133,13 +145,16 @@
         <button type="button" class="link-btn oscuro" id="orden-limpiar" ${borrador.lineas.length ? '' : 'hidden'}>Vaciar orden</button>
         <button type="button" class="btn" id="orden-enviar">Enviar pedido al proveedor</button>
       </div>
-      <p class="sec-note">Al reponer se sugiere completar el doble del mínimo, descontando lo que ya viene en camino. Si lo que viene en camino ya alcanza, esa prenda no se agrega.</p>
+      <p class="sec-note">El botón de reponer usa una regla fija del panel, no la predicción de la IA: a cada prenda por reponer le pide lo que falta para llegar al doble de su stock mínimo, descontando lo que ya viene en camino. Si lo que viene en camino ya alcanza, esa prenda no se agrega.</p>
+      ${A.api.esDemo() ? '<p class="regla-fija">Modo demo: la orden se simula y no se envía a ningún proveedor ni se guarda.</p>' : ''}
     </section>`;
   }
 
   /* ---------- Órdenes de compra ---------- */
 
   function ordenesHtml() {
+    if (!A.api.disponible('compras')) return A.noDisponible('No se pudieron cargar las órdenes de compra.', A.frase(A.api.motivo('compras')));
+    const recibir = A.api.puede('recibir').ok;
     const lista = A.store.compras
       .filter(function (c) { return !filtro || c.estado === filtro; })
       .sort(function (a, b) { return new Date(b.fecha) - new Date(a.fecha); });
@@ -157,7 +172,7 @@
         }).join('')}</ul>
         <div class="remision-pie">
           <span class="tiquete-total">${fmt(c.total)}</span>
-          ${c.estado === 'pendiente' ? `<button class="btn-mini" data-recibir="${esc(c.id_compra)}">Recibir mercancía</button>` : ''}
+          ${c.estado === 'pendiente' && recibir ? `<button class="btn-mini" data-recibir="${esc(c.id_compra)}">Recibir mercancía</button>` : ''}
         </div>
       </article>`;
     }).join('');
@@ -177,24 +192,24 @@
       };
 
       return `
-      <p class="inv-resumen">${pendientes.length
+      <p class="inv-resumen">${!A.api.disponible('compras') ? '' : pendientes.length
         ? `<b>${pendientes.length}</b> ${pendientes.length === 1 ? 'orden' : 'órdenes'} en camino por <b>${fmt(valor)}</b>.`
         : 'No hay mercancía en camino.'}
-        ${s.variantes.filter(A.isLow).length ? `<b class="violeta">${s.variantes.filter(A.isLow).length} variantes por reponer.</b>` : ''}</p>
+        ${A.api.disponible('variantes') && s.variantes.filter(A.isLow).length ? `<b class="violeta">${s.variantes.filter(A.isLow).length} variantes por reponer.</b>` : ''}</p>
 
       <div class="compras-cols">
         <div id="orden-cont">${ordenHtml()}</div>
         <section aria-labelledby="ordenes-titulo">
           <div class="sec-head">
             <h3 class="sec" id="ordenes-titulo">Órdenes de compra</h3>
-            <div class="cat-chips" role="group" aria-label="Estado">${chip('pendiente', 'Por recibir')}${chip('recibida', 'Recibidas')}${chip('', 'Todas')}</div>
+            ${A.api.disponible('compras') ? `<div class="cat-chips" role="group" aria-label="Estado">${chip('pendiente', 'Por recibir')}${chip('recibida', 'Recibidas')}${chip('', 'Todas')}</div>` : ''}
           </div>
           <div class="tiquetes" id="ordenes">${ordenesHtml()}</div>
         </section>
       </div>
 
       <h3 class="sec sec-gap">Proveedores</h3>
-      <div class="table-wrap"><table>
+      ${!A.api.disponible('proveedores') ? A.noDisponible('No se pudieron cargar los proveedores.', A.frase(A.api.motivo('proveedores'))) : `<div class="table-wrap"><table>
         <thead><tr><th>Proveedor</th><th>Contacto</th><th>Correo</th><th>Teléfono</th></tr></thead>
         <tbody>
         ${s.proveedores.map(function (p) {
@@ -202,7 +217,7 @@
             <td>${esc(p.correo || '—')}</td><td>${esc(p.telefono || '—')}</td></tr>`;
         }).join('')}
         </tbody>
-      </table></div>`;
+      </table></div>`}`;
     },
 
     bind(root) {
@@ -262,11 +277,14 @@
             });
             borrador = { id_proveedor: '', lineas: [] };
             filtro = 'pendiente';
-            A.toast('<b>Pedido enviado.</b> La orden ' + esc(r.id_compra) + ' por ' + fmt(r.total) + ' quedó por recibir.');
+            A.toast(r.demo
+              ? '<b>Pedido simulado.</b> La orden ' + esc(r.id_compra) + ' por ' + fmt(r.total) + ' quedó por recibir en la demo; no se guardó.'
+              : '<b>Pedido guardado.</b> La orden ' + esc(r.id_compra) + ' por ' + fmt(r.total) + ' quedó por recibir.');
             A.app.refresh();
           } catch (err) {
+            if (err.vencida) return;
             b.disabled = false;
-            error('No se pudo enviar el pedido. ' + err.message);
+            error('No se pudo guardar el pedido. ' + A.frase(err.message));
           }
         }
       });
@@ -279,18 +297,22 @@
         });
       });
 
-      root.querySelector('#ordenes').addEventListener('click', async function (e) {
+      const ordenes = root.querySelector('#ordenes');
+      if (ordenes) ordenes.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-recibir]');
         if (!btn) return;
         const id = Number(btn.dataset.recibir);
         btn.disabled = true;
         try {
-          await A.api.recibirCompra(id);
-          A.toast('<b>Mercancía recibida.</b> La orden ' + esc(id) + ' ya se sumó al inventario.');
+          const r = await A.api.recibirCompra(id);
+          A.toast(r && r.demo
+            ? '<b>Recepción simulada.</b> La orden ' + esc(id) + ' se sumó al inventario de prueba; no se guardó.'
+            : '<b>Mercancía recibida.</b> La orden ' + esc(id) + ' ya se sumó al inventario.');
           A.app.refresh();
         } catch (err) {
+          if (err.vencida) return;
           btn.disabled = false;
-          A.toast('<b>No se pudo recibir la orden.</b> ' + esc(err.message));
+          A.toast('<b>No se pudo recibir la orden.</b> ' + esc(A.frase(err.message)));
         }
       });
     },

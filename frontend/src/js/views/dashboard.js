@@ -19,6 +19,9 @@
 
     render() {
       const s = A.store;
+      const invOk = A.api.disponible('variantes');
+      const ventasOk = A.api.disponible('pedidos');
+      const anular = A.api.puede('anular').ok;
       const bajos = s.variantes.filter(A.isLow).sort(function (a, b) { return a.stock - b.stock; });
       const hoy = new Date().toDateString();
       const ventasHoy = s.pedidos.filter(function (p) {
@@ -27,7 +30,6 @@
       const totalHoy = ventasHoy.reduce(function (t, p) { return t + p.total; }, 0);
       const promedio = ventasHoy.length ? Math.round(totalHoy / ventasHoy.length) : 0;
       const porRecibir = s.compras.filter(function (c) { return c.estado === 'pendiente'; });
-      const esAdmin = A.session && A.session.rol === 'administrador';
       const ultimas = s.pedidos.slice().sort(function (a, b) { return new Date(b.fecha) - new Date(a.fecha); }).slice(0, 5);
 
       return `
@@ -35,18 +37,18 @@
         <div class="tag-grande">
           <span class="tag-grande-ojal" aria-hidden="true"></span>
           <p class="tag-grande-fecha">Vendido hoy, ${esc(hoyLargo())}</p>
-          <p class="tag-grande-total">${fmt(totalHoy)}</p>
-          <dl class="tag-grande-datos">
+          <p class="tag-grande-total">${ventasOk ? fmt(totalHoy) : '—'}</p>
+          ${ventasOk ? `<dl class="tag-grande-datos">
             <div><dt>Ventas</dt><dd>${ventasHoy.length}</dd></div>
             <div><dt>Promedio por venta</dt><dd>${fmt(promedio)}</dd></div>
-          </dl>
+          </dl>` : `<p class="tag-grande-fecha">No se pudieron cargar las ventas.</p>`}
         </div>
 
         <div class="resumen-avisos">
-          <a class="aviso ${bajos.length ? 'aviso-violeta' : ''}" href="#/inventario" data-reponer>
+          ${invOk ? `<a class="aviso ${bajos.length ? 'aviso-violeta' : ''}" href="#/inventario" data-reponer>
             <b>${bajos.length}</b><span>${bajos.length === 1 ? 'variante por reponer' : 'variantes por reponer'}</span>
-          </a>
-          ${A.app.can('compras') ? `<a class="aviso" href="#/compras">
+          </a>` : ''}
+          ${A.app.can('compras') && A.api.disponible('compras') ? `<a class="aviso" href="#/compras">
             <b>${porRecibir.length}</b><span>${porRecibir.length === 1 ? 'compra por recibir' : 'compras por recibir'}</span>
           </a>` : ''}
         </div>
@@ -55,7 +57,7 @@
       <div class="resumen-cols">
         <section>
           <h3 class="sec">Por reponer</h3>
-          ${bajos.length ? `<div class="clavadas">${bajos.map(function (v, i) {
+          ${!invOk ? A.noDisponible('No se pudo cargar el inventario.', A.frase(A.api.motivo('variantes'))) : bajos.length ? `<div class="clavadas">${bajos.map(function (v, i) {
             const pct = Math.max(4, Math.min(100, Math.round(v.stock / Math.max(1, v.stock_minimo) * 100)));
             return `<article class="clavada" style="--giro:${(i % 3 - 1) * 1.6}deg">
               <span class="alfiler" aria-hidden="true"></span>
@@ -72,9 +74,9 @@
 
         <section>
           <h3 class="sec">Últimas ventas</h3>
-          ${ultimas.length ? `<div class="tiquetes" id="tiquetes">${ultimas.map(function (p) {
+          ${!ventasOk ? A.noDisponible('No se pudieron cargar las ventas.', A.frase(A.api.motivo('pedidos'))) : ultimas.length ? `<div class="tiquetes" id="tiquetes">${ultimas.map(function (p) {
             const anulada = p.estado === 'cancelado';
-            const anulable = esAdmin && ['pendiente', 'confirmado'].indexOf(p.estado) !== -1;
+            const anulable = anular && ['pendiente', 'confirmado'].indexOf(p.estado) !== -1;
             return `<article class="tiquete ${anulada ? 'anulado' : ''}">
               <div class="tiquete-fila"><b>Pedido ${esc(p.id_pedido)}</b><span>${esc(A.hora(p.fecha))}</span></div>
               <div class="tiquete-fila sub"><span>${esc(p.usuario)}</span><span class="pill ${anulada ? 'pill-warn' : 'pill-ok'}">${anulada ? 'anulada' : esc(p.estado)}</span></div>
@@ -111,12 +113,15 @@
         } else if (b.dataset.paso === 'si') {
           b.disabled = true;
           try {
-            await A.api.cancelarVenta(id);
-            A.toast('<b>Venta ' + esc(id) + ' anulada.</b> Las prendas volvieron al inventario.');
+            const r = await A.api.cancelarVenta(id);
+            A.toast(r.demo
+              ? '<b>Venta ' + esc(id) + ' anulada en la demo.</b> Las prendas volvieron al inventario de prueba; no se guardó en la base de datos.'
+              : '<b>Venta ' + esc(id) + ' anulada.</b> Las prendas volvieron al inventario.');
             A.app.refresh();
           } catch (err) {
+            if (err.vencida) return;
             b.disabled = false;
-            A.toast('<b>No se pudo anular la venta.</b> ' + esc(err.message));
+            A.toast('<b>No se pudo anular la venta.</b> ' + esc(A.frase(err.message)));
           }
         }
       });

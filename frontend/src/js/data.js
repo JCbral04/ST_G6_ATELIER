@@ -1,8 +1,9 @@
 /* =============================================================
-   ATELIER — datos de respaldo (modo demo)
-   Espejo de db/seed.sql DESPUÉS de ejecutar los triggers.
-   Se usan solo si la API no responde; cuando el backend expone
-   los endpoints (issue #10) la interfaz toma los datos reales.
+   ATELIER — datos de prueba (solo modo demo)
+   Espejo de db/seed.sql DESPUÉS de ejecutar los triggers, con algunas
+   variantes de más para mostrar alertas y tallas.
+   Se usan únicamente cuando se entra con "Probar en modo demo".
+   Una sesión real NUNCA los mezcla con datos de la API.
    ============================================================= */
 (function (A) {
   'use strict';
