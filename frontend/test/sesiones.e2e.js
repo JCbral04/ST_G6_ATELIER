@@ -349,6 +349,93 @@ const ESCENARIOS = [
     const ok = e.login && !e.app && /venció/.test(e.error) && e.modo === null && !e.token && !e.guardada && e.variantes.length === 0;
     return [ok, `login visible=${e.login}, mensaje="${e.error}", modo=${e.modo}, store vacío=${e.variantes.length === 0}`, p];
   }],
+
+  ['IA-01', 'Prediccion autenticada', 'Administrador consulta IA con token y obtiene recomendaciones', async (b, base) => {
+    const api = crearApi();
+    const p = await nuevaPagina(b, base, api);
+    api.respuestas['POST /api/ia/reposicion'] = () => ({
+      status: 200,
+      body: {
+        modo: 'prediccion',
+        fecha_corte: '2026-11-20',
+        advertencias: [],
+        items: [{
+          sku: 'SKU-IA',
+          producto: 'Camiseta',
+          stock: 5,
+          transito: 0,
+          modelo: 'ridge',
+          demanda_diaria: 2,
+          cobertura_dias: 2.5,
+          riesgo: 'ALTO',
+          cantidad_sugerida: 25
+        }]
+      }
+    });
+    await loginReal(p, 'admin@atelier.test');
+    await p.click('[data-v="ia"]');
+    await p.click('#ia-run');
+    await p.waitForFunction(() =>
+      document.querySelector('#ia-results').textContent.includes('SKU-IA')
+    );
+    const llamadas = api.log.filter(x =>
+      x.clave === 'POST /api/ia/reposicion' && x.token
+    );
+    return [llamadas.length === 1, 'Prediccion visible y autenticada', p];
+  }],
+
+  ['IA-02', 'Fallback estatico', 'Las alertas no se presentan como predicciones', async (b, base) => {
+    const api = crearApi();
+    const p = await nuevaPagina(b, base, api);
+    api.respuestas['POST /api/ia/reposicion'] = () => ({
+      status: 200,
+      body: {
+        modo: 'alerta_estatica',
+        advertencias: ['IA no disponible'],
+        items: [{
+          sku: 'SKU-FALLBACK',
+          producto: 'Camiseta',
+          stock: 1,
+          transito: '0',
+          cantidad_sugerida: '4'
+        }]
+      }
+    });
+    await loginReal(p, 'admin@atelier.test');
+    await p.click('[data-v="ia"]');
+    await p.click('#ia-run');
+    await p.waitForFunction(() =>
+      document.querySelector('#ia-results').textContent.includes('SKU-FALLBACK')
+    );
+    const msg = await p.textContent('#ia-status');
+    return [msg.includes('alertas estáticas'), 'Fallback identificado', p];
+  }],
+
+  ['IA-03', 'Modo demo', 'La demo no consulta IA', async (b, base) => {
+    const api = crearApi();
+    const p = await nuevaPagina(b, base, api);
+    await entrarDemo(p, 'administrador');
+    await p.click('[data-v="ia"]');
+    await p.waitForSelector('.ia-panel');
+    const boton = await p.locator('#ia-run').count();
+    const peticiones = api.log.length;
+    return [boton === 0 && peticiones === 0,
+      'Boton ausente; peticiones=' + peticiones, p];
+  }],
+
+  ['IA-04', 'Acceso del vendedor', 'El vendedor no puede abrir la vista IA', async (b, base) => {
+    const api = crearApi();
+    const p = await nuevaPagina(b, base, api);
+    await loginReal(p, 'vendedor@atelier.test');
+    await p.evaluate(() => { location.hash = '#/ia'; });
+    await p.waitForFunction(() => location.hash === '#/pos');
+    const enlace = await p.locator('[data-v="ia"]').count();
+    const panel = await p.locator('.ia-panel').count();
+    const llamadas = api.log.filter(x => x.clave === 'POST /api/ia/reposicion');
+    return [enlace === 0 && panel === 0 && llamadas.length === 0,
+      'IA inaccesible para vendedor', p];
+  }],
+
 ];
 
 (async () => {
