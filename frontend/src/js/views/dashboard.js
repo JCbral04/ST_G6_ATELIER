@@ -119,7 +119,7 @@
               : '<b>Venta ' + esc(id) + ' anulada.</b> Las prendas volvieron al inventario.');
             A.app.refresh();
           } catch (err) {
-            if (err.vencida) return;
+            if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
             b.disabled = false;
             A.toast('<b>No se pudo anular la venta.</b> ' + esc(A.frase(err.message)));
           }

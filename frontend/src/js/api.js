@@ -10,10 +10,17 @@
      reemplaza por datos de prueba. Las operaciones que dependen de ese
      recurso se desactivan y la interfaz explica por qué.
 
-   - Modo demo: se elige a propósito desde el login ("Probar en modo
-     demo"). Usa solo los datos de data.js en memoria y no hace ninguna
-     petición a la API, aunque el servidor esté disponible. La interfaz
-     lo avisa todo el tiempo: nada se guarda en PostgreSQL.
+   - Modo demo: se elige a propósito desde el talón del login ("Entrar
+     a la demo"). Usa solo los datos de data.js en memoria y no hace
+     ninguna petición a la API, aunque el servidor esté disponible. La
+     interfaz lo avisa todo el tiempo: nada se guarda en PostgreSQL.
+
+   Aislamiento entre sesiones: cada sesión tiene un contexto (generación,
+   token y modo). Al iniciar, cerrar o vencer una sesión se crea un
+   contexto nuevo y se cancelan las peticiones pendientes del anterior.
+   Una respuesta que llega de un contexto viejo se descarta (error
+   "obsoleta"): no toca el store, no cierra la sesión nueva y no muestra
+   confirmaciones.
    ============================================================= */
 (function (A) {
   'use strict';
@@ -37,35 +44,68 @@
 
   function esDemo() { return A.store.modo === 'demo'; }
 
+  /* ---------- Contexto de sesión ---------- */
+
+  let generacion = 0;
+  let controlador = new AbortController();
+
+  // Invalida todo lo que esté pendiente: se llama al iniciar, cerrar o
+  // vencer una sesión y al empezar un intento de login.
+  function nuevoContexto() {
+    generacion += 1;
+    controlador.abort();
+    controlador = new AbortController();
+  }
+  function contexto() {
+    return { gen: generacion, token: A.token || null, modo: A.store.modo, signal: controlador.signal };
+  }
+  function vigente(c) {
+    return c.gen === generacion && c.token === (A.token || null) && c.modo === A.store.modo;
+  }
+  function obsoleta() {
+    return ApiError('La operación pertenece a una sesión anterior.', 0, { obsoleta: true });
+  }
+  function exigirVigente(c) { if (!vigente(c)) throw obsoleta(); }
+
   /* ---------- Petición HTTP (solo sesión real) ---------- */
 
-  // opciones.sinToken: no envía el Authorization (se usa para comprobar
-  // si una ruta exige sesión).
+  // Usa el token y el contexto que había al empezar la petición.
+  // opciones.token: petición independiente con un token concreto (revocar
+  // la sesión que se está cerrando). No se cancela ni toca la sesión actual.
   async function request(method, path, body, opciones) {
-    if (esDemo()) throw ApiError('En modo demo no se hacen peticiones a la API.', 0);
     opciones = opciones || {};
+    const independiente = 'token' in opciones;
+    const c = independiente ? null : contexto();
+    if (c && c.modo === 'demo') throw ApiError('En modo demo no se hacen peticiones a la API.', 0);
+    const token = independiente ? opciones.token : c.token;
+
     const headers = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (A.token && !opciones.sinToken) headers.Authorization = 'Bearer ' + A.token;
+    if (token) headers.Authorization = 'Bearer ' + token;
 
     let res;
     try {
       res = await fetch(BASE + path, {
         method: method, headers: headers, cache: 'no-store',
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: c ? c.signal : undefined,
       });
     } catch (e) {
+      // Cancelada por un cambio de sesión: no es un error de conexión
+      if (c && (e.name === 'AbortError' || !vigente(c))) throw obsoleta();
       throw ApiError(method === 'GET'
         ? 'No hay conexión con el servidor.'
         : 'No hubo respuesta del servidor. Revisa si la operación quedó registrada antes de repetirla.', 0);
     }
+    if (c) exigirVigente(c);
 
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
+    if (c) exigirVigente(c);
     const msg = data && typeof data.error === 'string' ? data.error : '';
 
-    if (res.status === 401 && A.token && !opciones.sinToken && path.indexOf('/api/auth/') !== 0) {
-      // El token venció o fue revocado: volver al login sin pasar a demo
+    // 401 de la sesión vigente (ya comprobado arriba): volver al login sin pasar a demo
+    if (res.status === 401 && c && c.token && path.indexOf('/api/auth/') !== 0) {
       if (A.app && A.app.sesionVencida) A.app.sesionVencida();
       throw ApiError('Tu sesión venció.', 401, { vencida: true });
     }
@@ -172,14 +212,17 @@
     variantes: [], pedidos: [], compras: [], proveedores: [], movimientos: [],
     venta: [],
     estado: {},          // recurso -> { ok, motivo }
-    ajustesSeguros: false,
   };
+
+  // Ajustes manuales reales: apagados hasta que se integre el PR #37 y se
+  // valide contra su contrato que POST /api/inventario/movimientos toma el
+  // usuario del token y exige rol. Cambiar a true solo después de eso.
+  const AJUSTES_REALES = false;
 
   function vaciar() {
     const s = A.store;
     Object.keys(RESOURCES).forEach(function (k) { s[k] = []; });
     s.estado = {};
-    s.ajustesSeguros = false;
     s.venta = [];
   }
 
@@ -191,8 +234,10 @@
   }
 
   // Recarga tras una escritura real. Si falla, la operación igual quedó guardada.
-  async function recargar() {
+  // Si la sesión cambió mientras tanto, la confirmación se descarta.
+  async function recargar(c) {
     try { await A.api.load(); } catch (e) { /* sesión vencida u otro error: lo maneja load/request */ }
+    exigirVigente(c);
   }
 
   // Lanza un error si la operación no se puede hacer en la sesión actual
@@ -213,51 +258,55 @@
 
     /* ---------- Sesión ---------- */
 
+    // Contexto de la sesión actual, para que app.js descarte trabajo viejo
+    contexto: contexto,
+    vigente: vigente,
+
     // Inicio de sesión real. Nunca cae a demo por su cuenta.
+    // Empieza un contexto nuevo: cualquier intento o carga anterior queda descartado.
     async login(correo, contrasena) {
-      A.store.modo = 'real';
+      nuevoContexto();
+      vaciar();
+      A.session = null;
       A.token = null;
+      A.store.modo = 'real';
+      const c = contexto();
       let data;
       try {
         data = await request('POST', '/api/auth/login', { correo: correo, contrasena: contrasena });
       } catch (err) {
+        if (err.obsoleta) throw err;
         if (err.status === 401) throw ApiError('Correo o contraseña incorrectos.', 401);
         if (err.status === 429) throw ApiError('Demasiados intentos fallidos. Espera unos minutos y vuelve a intentar.', 429);
         if (err.status === 400) throw ApiError('Revisa el correo y la contraseña.', 400);
         if (err.status === 0 || [404, 405, 501].indexOf(err.status) !== -1) {
-          throw ApiError('No hay conexión con el servidor de ATELIER. Si solo quieres ver el panel, entra en modo demo.', 0, { sinServidor: true });
+          throw ApiError('No hay conexión con el servidor de ATELIER. Si solo quieres ver el panel, entra a la demo.', 0, { sinServidor: true });
         }
         throw ApiError('No se pudo iniciar sesión. Intenta de nuevo en un momento.', err.status);
       }
+      exigirVigente(c);
       if (!data || typeof data.token !== 'string' || data.token.length < 20) {
         throw ApiError('El servidor respondió con un formato inesperado al iniciar sesión.', 0, { formato: true });
       }
-      let usuario;
       try {
-        usuario = validarUsuario(data.usuario);
+        return { usuario: validarUsuario(data.usuario), token: data.token, modo: 'real' };
       } catch (err) {
-        // Rol no admitido: se revoca el token que alcanzó a entregar el servidor
-        if (err.rol) {
-          A.token = data.token;
-          try { await request('POST', '/api/auth/logout'); } catch (e) { /* no importa */ }
-          A.token = null;
-        }
+        // Rol no admitido: se revoca ese token con una petición independiente
+        if (err.rol) request('POST', '/api/auth/logout', undefined, { token: data.token }).catch(function () {});
         throw err;
       }
-      return { usuario: usuario, token: data.token, modo: 'real' };
     },
 
-    // Modo demo elegido a propósito: solo datos de prueba, sin peticiones a la API
-    loginDemo(correo, contrasena) {
-      const u = A.mock.usuarios.find(function (x) { return x.correo === correo; });
-      if (!u || contrasena !== '123456') {
-        throw ApiError('En modo demo solo funcionan las cuentas de prueba (contraseña 123456).', 401);
-      }
+    // Demo elegida a propósito: usuario ficticio, sin contraseña ni peticiones a la API
+    loginDemo(rol) {
+      const u = A.mock.usuarios.find(function (x) { return x.rol === rol; });
+      if (!u) throw ApiError('Ese rol no existe en la demo.', 0);
       return { usuario: clone(u), token: null, modo: 'demo' };
     },
 
-    // Activa la sesión ya validada
+    // Activa la sesión ya validada en un contexto nuevo
     iniciar(sesion) {
+      nuevoContexto();
       vaciar();
       A.store.modo = sesion.modo;
       A.session = sesion.usuario;
@@ -265,8 +314,9 @@
       A.storage.set(SESION, { usuario: sesion.usuario, token: A.token, modo: sesion.modo });
     },
 
-    // Cierra la sesión local sin llamar a la API (token vencido)
+    // Cierra la sesión local de inmediato (también cuando el token venció)
     olvidarSesion() {
+      nuevoContexto();
       A.token = null;
       A.session = null;
       A.store.modo = null;
@@ -274,9 +324,17 @@
       A.storage.remove(SESION);
     },
 
-    async logout() {
-      if (!esDemo() && A.token) { try { await request('POST', '/api/auth/logout'); } catch (e) { /* ya no importa */ } }
+    // Cierre de sesión: primero se cierra la sesión local (contexto nuevo,
+    // store y sessionStorage limpios) y después se pide revocar en el
+    // servidor SOLO el token que se estaba cerrando. Esa petición no toca
+    // el estado local, así que si termina tarde no afecta una sesión nueva.
+    // Devuelve una promesa: true si el servidor confirmó la revocación.
+    logout() {
+      const token = esDemo() ? null : A.token;
       A.api.olvidarSesion();
+      if (!token) return Promise.resolve(true);
+      return request('POST', '/api/auth/logout', undefined, { token: token })
+        .then(function () { return true; }, function () { return false; });
     },
 
     // Recupera la sesión de la pestaña. Una sesión real se valida con /api/auth/me;
@@ -287,12 +345,17 @@
       if (s.modo === 'demo') {
         try { return { usuario: validarUsuario(s.usuario), token: null, modo: 'demo' }; } catch (e) { A.storage.remove(SESION); return null; }
       }
+      nuevoContexto();
       A.store.modo = 'real';
       A.token = s.token;
+      const c = contexto();
       try {
         const data = await request('GET', '/api/auth/me');
+        exigirVigente(c);
         return { usuario: validarUsuario(data.usuario), token: s.token, modo: 'real' };
       } catch (err) {
+        // Si otra sesión empezó mientras se validaba, no se toca nada
+        if (err.obsoleta || !vigente(c)) return null;
         A.token = null;
         A.store.modo = null;
         A.storage.remove(SESION);
@@ -304,42 +367,30 @@
 
     /* ---------- Carga de datos ---------- */
 
+    // Carga los recursos del rol. Las respuestas se juntan aparte y solo se
+    // escriben en el store si la sesión sigue siendo la misma que las pidió.
     async load() {
       const s = A.store;
+      const c = contexto();
       const keys = recursosDelRol();
 
       if (esDemo()) {
         keys.forEach(function (k) { s[k] = clone(A.mock[k] || []); s.estado[k] = { ok: true }; });
-        s.ajustesSeguros = true;
         return s;
       }
 
-      let vencida = false;
-      await Promise.all(keys.map(async function (key) {
+      const resultados = await Promise.all(keys.map(async function (key) {
         try {
           const rows = await request('GET', RESOURCES[key]);
           if (!filasValidas(key, rows)) throw ApiError('formato', 200, { formato: true });
-          s[key] = normalizar(key, rows);
-          s.estado[key] = { ok: true };
+          return { key: key, data: normalizar(key, rows), estado: { ok: true } };
         } catch (err) {
-          if (err.vencida) vencida = true;
-          s[key] = [];
-          s.estado[key] = { ok: false, motivo: motivoDe(key, err) };
+          if (err.obsoleta || err.vencida) throw err;
+          return { key: key, data: [], estado: { ok: false, motivo: motivoDe(key, err) } };
         }
       }));
-      if (vencida || !A.session) throw ApiError('Tu sesión venció.', 401, { vencida: true });
-
-      // Los ajustes manuales solo se activan si la ruta exige sesión y toma
-      // el usuario del token (pendiente en el backend, PR #37). Se comprueba
-      // pidiendo el historial SIN token: si responde 200, la ruta no está protegida.
-      s.ajustesSeguros = false;
-      if (s.estado.movimientos && s.estado.movimientos.ok) {
-        try {
-          await request('GET', RESOURCES.movimientos + '?limite=1', undefined, { sinToken: true });
-        } catch (err) {
-          s.ajustesSeguros = err.status === 401;
-        }
-      }
+      exigirVigente(c);
+      resultados.forEach(function (r) { s[r.key] = r.data; s.estado[r.key] = r.estado; });
       return s;
     },
 
@@ -356,7 +407,7 @@
       else if (accion === 'anular') m = rol !== 'administrador' ? 'solo el administrador puede anular ventas' : falta('pedidos');
       else if (accion === 'ajustar') {
         m = falta('variantes') || falta('movimientos') ||
-          (A.store.ajustesSeguros ? '' : 'el servidor todavía no toma el usuario de la sesión al registrar ajustes (pendiente en el backend, PR #37)');
+          (esDemo() || AJUSTES_REALES ? '' : 'el registro real de ajustes sigue apagado hasta integrar y validar la autenticación de movimientos del backend (PR #37)');
       } else if (accion === 'comprar') m = falta('variantes') || falta('proveedores') || falta('compras');
       else if (accion === 'recibir') m = falta('compras');
       return { ok: !m, motivo: m ? m.charAt(0).toUpperCase() + m.slice(1) + '.' : '' };
@@ -384,11 +435,12 @@
       const items = venta.map(function (l) { return { id_variante: l.id_variante, cantidad: l.cantidad }; });
 
       if (!esDemo()) {
+        const c = contexto();   // la confirmación solo vale para esta sesión
         const body = await request('POST', '/api/pedidos', { items: items });
         if (!esId(body.id_pedido) || !esNum(body.total)) {
           throw ApiError('El servidor respondió algo inesperado. Revisa las últimas ventas antes de repetirla.', 0, { formato: true });
         }
-        await recargar();
+        await recargar(c);
         return { id_pedido: Number(body.id_pedido), total: Number(body.total), estado: body.estado };
       }
 
@@ -413,8 +465,9 @@
       exigir('anular');
       const s = A.store;
       if (!esDemo()) {
+        const c = contexto();   // la confirmación solo vale para esta sesión
         const body = await request('POST', '/api/pedidos/' + encodeURIComponent(idPedido) + '/cancelar');
-        await recargar();
+        await recargar(c);
         return body;
       }
       const p = s.pedidos.find(function (x) { return x.id_pedido === idPedido; });
@@ -438,11 +491,12 @@
       exigir('comprar');
       const s = A.store;
       if (!esDemo()) {
+        const c = contexto();   // la confirmación solo vale para esta sesión
         const body = await request('POST', '/api/compras', orden);
         if (!esId(body.id_compra) || !esNum(body.total)) {
           throw ApiError('El servidor respondió algo inesperado. Revisa las órdenes antes de repetirla.', 0, { formato: true });
         }
-        await recargar();
+        await recargar(c);
         return { id_compra: Number(body.id_compra), total: Number(body.total), estado: body.estado };
       }
       const prov = s.proveedores.find(function (p) { return p.id_proveedor === orden.id_proveedor; });
@@ -461,8 +515,9 @@
       exigir('recibir');
       const s = A.store;
       if (!esDemo()) {
+        const c = contexto();   // la confirmación solo vale para esta sesión
         const body = await request('PATCH', '/api/compras/' + encodeURIComponent(idCompra), { estado: 'recibida' });
-        await recargar();
+        await recargar(c);
         return body;
       }
       const c = s.compras.find(function (x) { return x.id_compra === idCompra; });
@@ -486,11 +541,12 @@
       exigir('ajustar');
       const payload = { id_variante: mov.id_variante, tipo: mov.tipo, cantidad: mov.cantidad, motivo: mov.motivo };
       if (!esDemo()) {
+        const c = contexto();   // la confirmación solo vale para esta sesión
         const body = await request('POST', '/api/inventario/movimientos', payload);
         if (!esNum(body.stock_actual)) {
           throw ApiError('El servidor respondió algo inesperado. Revisa el historial antes de repetir el ajuste.', 0, { formato: true });
         }
-        await recargar();
+        await recargar(c);
         return { stock_actual: Number(body.stock_actual), sku: body.movimiento && body.movimiento.sku };
       }
       const v = variante(payload.id_variante);

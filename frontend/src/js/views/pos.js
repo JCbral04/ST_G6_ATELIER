@@ -250,7 +250,7 @@
             A.app.refresh();
           } catch (err) {
             t.disabled = false;
-            if (err.vencida) return;
+            if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
             A.toast('<b>No se confirmó la venta.</b> ' + esc(A.frase(err.message)) + (err.status === 0 ? '' : ' El inventario no cambió.'));
           }
         }

@@ -54,17 +54,6 @@
       }
       toggle.addEventListener('click', function () { setVisible(pass.type === 'password'); pass.focus(); });
 
-      // Cuentas de prueba del talón: llenan el formulario
-      form.querySelectorAll('[data-demo]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          correo.value = b.dataset.demo;
-          pass.value = '123456';
-          formErr.textContent = '';
-          validateCorreo(correo); validateContrasena(pass);
-          form.querySelector('button[type=submit]').focus();
-        });
-      });
-
       // Valida al salir del campo y corrige en vivo una vez marcado como inválido
       correo.addEventListener('blur', function () { validateCorreo(correo); });
       pass.addEventListener('blur', function () { validateContrasena(pass); });
@@ -85,12 +74,25 @@
         }
         return ok;
       }
-      function entrar(sesion) {
+      // Un solo intento de entrada a la vez: mientras uno está en curso,
+      // el botón de ingresar y los de la demo quedan bloqueados (también en la lógica).
+      const btnLogin = form.querySelector('button[type=submit]');
+      const btnsDemo = Array.prototype.slice.call(document.querySelectorAll('[data-demo-rol]'));
+      let autenticando = false;
+      function bloquear(si) {
+        autenticando = si;
+        btnLogin.disabled = si;
+        btnsDemo.forEach(function (b) { b.disabled = si; });
+        form.setAttribute('aria-busy', String(si));
+      }
+
+      // Espera a que el panel termine de abrir antes de soltar el bloqueo
+      async function entrar(sesion) {
         form.reset();
         setVisible(false);
         formErr.textContent = '';
         form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
-        onSuccess(sesion);
+        await onSuccess(sesion);
       }
       function fallo(err) {
         formErr.textContent = err.message || 'No se pudo iniciar sesión.';
@@ -104,31 +106,33 @@
       // en demo por su cuenta: lo dice y la persona decide.
       form.addEventListener('submit', async function (e) {
         e.preventDefault();
-        if (!camposOk()) return;
-        const btn = form.querySelector('button[type=submit]');
-        btn.disabled = true;
-        btn.textContent = 'Ingresando…';
+        if (autenticando || !camposOk()) return;
+        bloquear(true);
+        btnLogin.textContent = 'Ingresando…';
         try {
-          entrar(await A.api.login(correo.value.trim().toLowerCase(), pass.value));
+          await entrar(await A.api.login(correo.value.trim().toLowerCase(), pass.value));
         } catch (err) {
-          fallo(err);
+          if (!err.obsoleta) fallo(err);
         } finally {
-          btn.disabled = false;
-          btn.textContent = 'Ingresar';
+          bloquear(false);
+          btnLogin.textContent = 'Ingresar';
         }
       });
 
-      // Modo demo explícito: datos de prueba, sin ninguna petición a la API
-      document.getElementById('demo-btn').addEventListener('click', function () {
-        if (!camposOk()) {
-          formErr.textContent = 'Para el modo demo elige una de las cuentas de prueba de arriba.';
-          return;
-        }
-        try {
-          entrar(A.api.loginDemo(correo.value.trim().toLowerCase(), pass.value));
-        } catch (err) {
-          fallo(err);
-        }
+      // Demo explícita con usuarios ficticios: sin contraseña ni peticiones a la API.
+      // Las credenciales reales nunca se muestran en esta pantalla.
+      btnsDemo.forEach(function (b) {
+        b.addEventListener('click', async function () {
+          if (autenticando) return;
+          bloquear(true);
+          try {
+            await entrar(A.api.loginDemo(b.dataset.demoRol));
+          } catch (err) {
+            fallo(err);
+          } finally {
+            bloquear(false);
+          }
+        });
       });
     },
   };

@@ -1,0 +1,11 @@
+{
+  "name": "atelier-frontend-pruebas",
+  "private": true,
+  "description": "Pruebas de aislamiento de sesión del panel ATELIER (SES-01 a SES-10)",
+  "scripts": {
+    "test": "node sesiones.e2e.js"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}

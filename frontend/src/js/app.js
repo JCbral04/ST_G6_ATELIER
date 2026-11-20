@@ -77,9 +77,10 @@
 
   async function enterApp(sesion) {
     A.api.iniciar(sesion);
+    const ctx = A.api.contexto();
     // Defensa extra: un rol sin vistas no entra al panel
     if (!allowed().length) {
-      await logout();
+      logout();
       $('login-error').textContent = 'Tu cuenta no tiene acceso al panel de la tienda.';
       return;
     }
@@ -93,18 +94,24 @@
     try {
       await A.api.load();
     } catch (e) {
-      return;   // la sesión venció mientras cargaba: ya está en el login
+      return;   // la sesión venció o cambió mientras cargaba
     }
+    if (!A.api.vigente(ctx)) return;   // otra sesión empezó: no pintar esta
     route();
   }
 
-  async function logout() {
-    await A.api.logout();
+  // La sesión local se cierra de una; la revocación en el servidor sigue
+  // por su lado con el token viejo y no vuelve a tocar nada al terminar.
+  function logout() {
+    A.api.logout();
     salir();
   }
 
   function salir() {
     current = null;
+    const t = $('toast');
+    clearTimeout(t._h);
+    t.classList.remove('show');
     $('app').hidden = true;
     $('login').hidden = false;
     $('screen').replaceChildren();

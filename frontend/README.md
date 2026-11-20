@@ -35,16 +35,17 @@ cd backend && npm run dev
 Express sirve esta carpeta como estática, así que la interfaz y la API comparten origen.
 
 **Sin backend (modo demo):** abrir `frontend/index.html` en el navegador, o servir la carpeta, y
-entrar con **Probar en modo demo**:
+entrar con **Demo como administrador** o **Demo como vendedor**:
 
 ```bash
 cd frontend && python3 -m http.server 8080   # http://localhost:8080
 ```
 
-Cuentas de prueba del personal, contraseña `123456`: `admin@atelier.com` y
-`vendedor@atelier.com`. También aparecen en el login para llenarlo con un clic. Solo entran
-los roles `administrador` y `vendedor`; cualquier otro rol (por ejemplo el legado `cliente`)
-se rechaza al iniciar o recuperar la sesión.
+El login no muestra credenciales: las cuentas reales son las del entorno (en local, las de
+`db/seed.sql`) y la demo usa usuarios ficticios sin contraseña. Antes de publicar, las cuentas
+del seed deben cambiarse en el entorno remoto. Solo entran los roles `administrador` y
+`vendedor`; cualquier otro rol (por ejemplo el legado `cliente`) se rechaza al iniciar o
+recuperar la sesión, y el token que alcanzó a entregar el servidor se revoca.
 
 ## Datos: sesión real o modo demo
 
@@ -56,7 +57,7 @@ Son dos modos separados y nunca se mezclan (`src/js/api.js`):
   por datos de prueba. Las operaciones que dependen de él se desactivan y la pantalla explica
   por qué. Si el servidor no responde al iniciar sesión, el login lo dice y no entra solo a demo.
   Si la API responde 401 (token vencido o revocado), el panel vuelve al login.
-- **Modo demo** (botón *Probar en modo demo*): usa solo `src/js/data.js` en memoria y no hace
+- **Modo demo** (botones *Demo como…*): usa solo `src/js/data.js` en memoria y no hace
   ninguna petición a la API, aunque el servidor esté encendido. Una franja arriba del contenido
   y el indicador del encabezado avisan que nada se guarda.
 
@@ -65,20 +66,47 @@ El indicador del encabezado muestra **Conectado a la base de datos**, **Conexió
 
 | Recurso | Endpoint | Estado | Sin él, en sesión real |
 |---|---|---|---|
-| Variantes con stock | `GET /api/inventario` | pendiente (PR #15) | ventas, ajustes y pedidos a proveedores desactivados |
+| Variantes con stock | `GET /api/inventario` | integrado (PR #15) | ventas, ajustes y pedidos a proveedores desactivados |
 | Sesión | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` | PR #34 | no se puede entrar (solo demo) |
 | Pedidos | `GET /api/pedidos`, `POST /api/pedidos`, `POST /api/pedidos/:id/cancelar` | PR #11 y #34 | resumen de ventas y anulación sin datos |
-| Movimientos | `GET /api/inventario/movimientos`, `POST /api/inventario/movimientos` | PR #30; autenticación en PR #37 | historial y ajustes sin datos |
-| Compras | `GET /api/compras`, `POST /api/compras`, `PATCH /api/compras/:id` | PR #44 | órdenes desactivadas |
-| Proveedores | `GET /api/proveedores` | PR #44 | pedidos a proveedores desactivados |
+| Movimientos | `GET /api/inventario/movimientos`, `POST /api/inventario/movimientos` | PR #30; autenticación pendiente (PR #37) | historial y ajustes sin datos |
+| Compras | `GET /api/compras`, `POST /api/compras`, `PATCH /api/compras/:id` | integrado (PR #44) | órdenes desactivadas |
+| Proveedores | `GET /api/proveedores` | integrado (PR #44) | pedidos a proveedores desactivados |
 
-**Ajustes manuales:** el navegador ya no envía `id_usuario`; el servidor debe tomar el usuario del
-token. Mientras la ruta de movimientos responda sin token (antes de #37), el panel deja el registro
-real de ajustes desactivado. Lo comprueba pidiendo el historial sin `Authorization`: si responde
-401, la ruta está protegida y el formulario se activa.
+**Ajustes manuales:** el navegador no envía `id_usuario`; el servidor lo toma del token. El
+registro real de ajustes queda apagado con la constante `AJUSTES_REALES = false` de `api.js`
+hasta que se integre el PR #37 y se valide contra su contrato (`POST` con sesión, rol
+administrador o vendedor y actor tomado del token). En la demo funciona normal.
+
+**Aislamiento entre sesiones:** cada sesión tiene un contexto (generación, token y modo). Al
+iniciar, cerrar o vencer una sesión se crea uno nuevo y se cancelan con `AbortController` las
+peticiones pendientes del anterior. Toda respuesta que llega de un contexto viejo se descarta:
+no escribe en el store, un 401 viejo no cierra la sesión nueva y no aparecen confirmaciones de
+operaciones de otra sesión. Las cargas juntan las respuestas aparte y solo las escriben si la
+sesión sigue siendo la misma. El cierre de sesión es local e inmediato y la revocación en el
+servidor se pide con el token viejo, sin volver a tocar el estado. En el login solo puede haber
+un intento de entrada a la vez (real o demo).
 
 **Reponer en compras:** el botón *Completar al doble del mínimo* es una regla fija del panel
 (`stock_minimo × 2 − stock − en camino`), no la predicción del microservicio de IA.
+
+## Pruebas de sesión
+
+`test/sesiones.e2e.js` reproduce en Chromium los escenarios SES-01 a SES-10 (logout durante una
+carga, cambio real a demo, administrador a vendedor, 401 de una sesión anterior, login real y
+demo a la vez, logout lento, recuperación invalidada, recarga después de una operación,
+verificación de movimientos y expiración). Usa una API simulada con demoras controladas, así que
+no necesita base de datos ni credenciales reales:
+
+```bash
+cd frontend/test
+npm install
+npx playwright install chromium
+npm test
+```
+
+Imprime una tabla con el resultado de cada escenario (PASS o FAIL) y termina con código 1 si
+alguno falla.
 
 Forma que espera el panel para las compras:
 
@@ -112,6 +140,7 @@ La alerta de stock se activa cuando `stock <= stock_minimo`.
 ```
 frontend/
 ├── index.html            # login + shell (navegación lateral, topbar)
+├── test/                 # pruebas de aislamiento de sesión (Playwright)
 └── src/
     ├── css/styles.css    # paleta del equipo (#9314EB, #129AED, blanco, negro) + responsive
     ├── fonts/            # Bricolage Grotesque y Hanken Grotesk (OFL), sin depender de internet

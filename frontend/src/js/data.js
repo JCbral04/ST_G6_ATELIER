@@ -2,7 +2,7 @@
    ATELIER — datos de prueba (solo modo demo)
    Espejo de db/seed.sql DESPUÉS de ejecutar los triggers, con algunas
    variantes de más para mostrar alertas y tallas.
-   Se usan únicamente cuando se entra con "Probar en modo demo".
+   Se usan únicamente cuando se entra con los botones "Demo como…" del login.
    Una sesión real NUNCA los mezcla con datos de la API.
    ============================================================= */
 (function (A) {
@@ -23,9 +23,11 @@
 
     // Personal de la tienda (login provisional; autenticación real = RF-01, Fase 4).
     // El panel es de uso interno: no hay cuentas de clientes.
+    // Usuarios ficticios de la demo. No son cuentas del servidor y no tienen contraseña:
+    // se entra con los botones "Entrar a la demo" del login.
     usuarios: [
-      { id_usuario: 1, nombre: 'Admin ATELIER', correo: 'admin@atelier.com', rol: 'administrador' },
-      { id_usuario: 3, nombre: 'Vendedor de prueba', correo: 'vendedor@atelier.com', rol: 'vendedor' },
+      { id_usuario: 1, nombre: 'Administrador demo', correo: 'admin@demo.atelier', rol: 'administrador' },
+      { id_usuario: 3, nombre: 'Vendedor demo', correo: 'vendedor@demo.atelier', rol: 'vendedor' },
     ],
 
     // Forma esperada de GET /api/inventario (una fila por variante).

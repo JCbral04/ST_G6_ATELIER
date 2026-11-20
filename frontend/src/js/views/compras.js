@@ -282,7 +282,7 @@
               : '<b>Pedido guardado.</b> La orden ' + esc(r.id_compra) + ' por ' + fmt(r.total) + ' quedó por recibir.');
             A.app.refresh();
           } catch (err) {
-            if (err.vencida) return;
+            if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
             b.disabled = false;
             error('No se pudo guardar el pedido. ' + A.frase(err.message));
           }
@@ -310,7 +310,7 @@
             : '<b>Mercancía recibida.</b> La orden ' + esc(id) + ' ya se sumó al inventario.');
           A.app.refresh();
         } catch (err) {
-          if (err.vencida) return;
+          if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
           btn.disabled = false;
           A.toast('<b>No se pudo recibir la orden.</b> ' + esc(A.frase(err.message)));
         }

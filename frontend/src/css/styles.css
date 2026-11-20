@@ -138,13 +138,7 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var
   font: 500 13px var(--body); padding: 5px 9px; cursor: pointer;
 }
 .tag-stub li button:hover { border-color: var(--blue); color: #0B6FAD; }
-.stub-demo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
-.stub-demo button {
-  display: block; margin: 6px 0 4px; background: none; border: 1px dashed var(--violet); border-radius: 6px;
-  color: var(--violet-dark); font: 600 14px var(--body); padding: 6px 10px; cursor: pointer;
-}
-.stub-demo button:hover { background: var(--violet-tint); }
-.stub-demo small { display: block; font-size: 12.5px; }
+.tag-stub li button:disabled { opacity: .5; cursor: not-allowed; }
 
 @keyframes tag-settle {
   0%   { transform: translateY(-40px) rotate(-7deg); opacity: 0; }

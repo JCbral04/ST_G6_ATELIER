@@ -295,7 +295,7 @@
           ajuste = { id_variante: ajuste.id_variante, tipo: ajuste.tipo, cantidad: '', motivo: '' };
           A.app.refresh();
         } catch (ex) {
-          if (ex.vencida) return;
+          if (ex.vencida || ex.obsoleta) return;   // la sesión cambió: nada que mostrar
           btn.disabled = false;
           err(ex.status === 422 ? 'No hay suficiente stock para esa salida. ' + A.frase(ex.message) : 'No se pudo registrar el ajuste. ' + A.frase(ex.message));
         }
