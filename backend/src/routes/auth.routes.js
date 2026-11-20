@@ -1,4 +1,3 @@
-
 const { Router } = require('express');
 const { randomBytes } = require('node:crypto');
 const rateLimit = require('express-rate-limit');
@@ -49,7 +48,8 @@ router.post('/login', loginLimiter, async (req, res) => {
       `SELECT id_usuario, nombre, rol
        FROM usuario
        WHERE correo = $1
-         AND contrasena_hash = crypt($2, contrasena_hash)`,
+         AND contrasena_hash = crypt($2, contrasena_hash)
+         AND rol IN ('administrador', 'vendedor')`,
       [correo.trim().toLowerCase(), contrasena]
     );
 

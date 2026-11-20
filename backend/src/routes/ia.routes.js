@@ -3,6 +3,19 @@ const rateLimit = require('express-rate-limit');
 const { pool } = require('../config/db');
 const { autenticar, permitirRoles } = require('../middleware/auth');
 const router = Router();
+
+const aiRequestTimeoutMs = Number(
+  process.env.AI_REQUEST_TIMEOUT_MS || '3000'
+);
+
+if (
+  !Number.isSafeInteger(aiRequestTimeoutMs) ||
+  aiRequestTimeoutMs < 1000 ||
+  aiRequestTimeoutMs > 120000
+) {
+  throw new Error('AI_REQUEST_TIMEOUT_MS fuera de rango');
+}
+
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
 router.use(autenticar, permitirRoles('administrador'));
 
@@ -18,7 +31,7 @@ router.post('/reposicion', async (req, res) => {
     const base = (process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
     const response = await fetch(`${base}/api/v1/predict/restock`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Internal-API-Key': process.env.AI_INTERNAL_KEY },
-      body: JSON.stringify({ horizon_days, lead_days }), signal: AbortSignal.timeout(3000),
+      body: JSON.stringify({ horizon_days, lead_days }), signal: AbortSignal.timeout(aiRequestTimeoutMs),
     });
     if (!response.ok) throw new Error('Servicio de IA no disponible');
     return res.json(await response.json());

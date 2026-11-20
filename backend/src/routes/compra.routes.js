@@ -2,6 +2,7 @@ const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../config/db');
 const { autenticar, permitirRoles } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = Router();
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 100,
@@ -109,6 +110,18 @@ router.post('/', async (req, res) => {
       await client.query(`INSERT INTO detalle_compra (id_compra, id_variante, cantidad, costo_unitario, subtotal)
         VALUES ($1, $2, $3, $4, $5)`, [row.id_compra, l.id, l.cantidad, l.costo, l.subtotal]);
     }
+    await registrarAuditoria(client, {
+      id_usuario: req.usuario.id_usuario,
+      accion: 'CREAR',
+      entidad: 'compra',
+      id_entidad: row.id_compra,
+      detalle: {
+        id_proveedor: orden.proveedor,
+        total: Number(row.total),
+        estado: row.estado,
+        lineas: orden.lineas.length,
+      },
+    });
     return { ...row, total: Number(row.total) };
   });
 });
@@ -138,6 +151,17 @@ router.patch('/:id', async (req, res) => {
     await client.query(`INSERT INTO movimiento_inventario (tipo, cantidad, motivo, id_variante, id_usuario)
       SELECT 'entrada', cantidad, $2, id_variante, $3
       FROM detalle_compra WHERE id_compra = $1`, [id, `Recepción de compra #${id}`, req.usuario.id_usuario]);
+    await registrarAuditoria(client, {
+      id_usuario: req.usuario.id_usuario,
+      accion: 'RECIBIR',
+      entidad: 'compra',
+      id_entidad: id,
+      detalle: {
+        estado_anterior: 'pendiente',
+        estado_nuevo: 'recibida',
+        items_recibidos: detalle.rows.length,
+      },
+    });
     return { id_compra: id, estado: 'recibida', mensaje: 'Mercancía recibida correctamente' };
   });
 });

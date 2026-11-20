@@ -30,10 +30,13 @@ WHERE p.activo ORDER BY v.id_variante
 def fetch_rows():
     import psycopg
     from psycopg.rows import dict_row
-    with psycopg.connect(os.environ['AI_DATABASE_URL'], row_factory=dict_row, connect_timeout=3) as conn:
+    with psycopg.connect(os.environ['AI_DATABASE_URL'], row_factory=dict_row, connect_timeout=int(os.getenv('AI_DB_CONNECT_TIMEOUT', '3'))) as conn:
         with conn.cursor() as cur:
             cur.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
-            cur.execute("SET LOCAL statement_timeout = '2000ms'")
+            cur.execute(
+                "SELECT set_config('statement_timeout', %s, true)",
+                (os.getenv('AI_DB_STATEMENT_TIMEOUT_MS', '2000'),)
+            )
             cur.execute('SELECT CURRENT_DATE AS fecha')
             today=cur.fetchone()['fecha']
             cur.execute(SQL)

@@ -21,10 +21,9 @@ INSERT INTO color (nombre, codigo_hex) VALUES
 ('Azul',   '#1F4E79'),
 ('Rojo',   '#C00000');
 
--- Usuarios de prueba (contraseña: '123456' -> reemplazar con hash real en Fase 4)
+-- Usuarios de prueba del personal ERP (contraseña: '123456')
 INSERT INTO usuario (nombre, correo, contrasena_hash, rol) VALUES
 ('Admin ATELIER',      'admin@atelier.com',    crypt('123456', gen_salt('bf')), 'administrador'),
-('Cliente de prueba',  'cliente@atelier.com',  crypt('123456', gen_salt('bf')), 'cliente'),
 ('Vendedor de prueba', 'vendedor@atelier.com', crypt('123456', gen_salt('bf')), 'vendedor');
 
 -- Proveedores
@@ -56,17 +55,19 @@ UPDATE compra SET estado = 'recibida' WHERE id_compra = 1;   -- dispara trg_stoc
 
 -- Movimiento de inventario (trazabilidad de la recepción)
 INSERT INTO movimiento_inventario (tipo, cantidad, motivo, id_variante, id_usuario) VALUES
-('entrada', 20, 'Compra #1 recibida - Textiles del Norte', 1, 1);
+('entrada', 20, 'Compra #1 recibida - Textiles del Norte', 1,
+ (SELECT id_usuario FROM usuario WHERE correo = 'admin@atelier.com'));
 
--- Pedido de prueba (trigger descuenta 2 a CAM-NEG-M -> 68)
+-- Pedido POS de prueba (trigger descuenta 2 a CAM-NEG-M -> 68; atribuido al vendedor)
 INSERT INTO pedido (id_usuario, total, estado) VALUES
-(2, 90000, 'confirmado');
+((SELECT id_usuario FROM usuario WHERE correo = 'vendedor@atelier.com'), 90000, 'confirmado');
 
 INSERT INTO detalle_pedido (cantidad, precio_unitario, subtotal, id_pedido, id_variante) VALUES
 (2, 45000, 90000, 1, 1);
 
 INSERT INTO movimiento_inventario (tipo, cantidad, motivo, id_variante, id_usuario) VALUES
-('salida', 2, 'Venta pedido #1', 1, 3);
+('salida', 2, 'Venta pedido #1', 1,
+ (SELECT id_usuario FROM usuario WHERE correo = 'vendedor@atelier.com'));
 
 -- Verificación rápida
 SELECT v.sku, v.stock FROM variante_producto v ORDER BY v.id_variante;

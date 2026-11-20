@@ -24,6 +24,7 @@ router.get('/health', async (req, res) => {
 router.use('/pedidos', require('./pedido.routes'));
 router.use('/auth', require('./auth.routes'));
 router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
+router.use('/auditoria', require('./auditoria.routes')); // Issue #27 (RNF-09)
 router.use('/compras', require('./compra.routes'));
 router.use('/proveedores', require('./proveedor.routes'));
 
