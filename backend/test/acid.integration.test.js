@@ -359,6 +359,81 @@ describe('Issue #28 — Integridad transaccional ACID', () => {
   });
 });
 
+describe('Issue #10 / PR #15 — Catálogo de productos, inventario y alertas (RF-06, RF-09, RF-10)', () => {
+
+  test('CAT-01: los tres endpoints GET rechazan peticiones sin sesión (401)', async () => {
+    const rutas = ['/api/productos', '/api/inventario', '/api/inventario/alertas'];
+
+    for (const ruta of rutas) {
+      const response = await request(app).get(ruta);
+      expect(response.status).toBe(401);
+    }
+  });
+
+  test('CAT-02: personal autenticado consulta productos, inventario y alertas del seed (200) excluyendo inactivos', async () => {
+    const prodRes = await request(app)
+      .get('/api/productos')
+      .set('Authorization', `Bearer ${vendedorToken}`);
+
+    expect(prodRes.status).toBe(200);
+    const camiseta = prodRes.body.find(p => p.producto === 'Camiseta básica algodón');
+    const jean = prodRes.body.find(p => p.producto === 'Jean clásico azul');
+    const chaqueta = prodRes.body.find(p => p.producto === 'Chaqueta denim');
+
+    expect(camiseta).toBeDefined();
+    expect(Number(camiseta.stock_total)).toBe(20);
+    expect(jean).toBeDefined();
+    expect(Number(jean.stock_total)).toBe(30);
+    expect(chaqueta).toBeDefined();
+    expect(Number(chaqueta.stock_total)).toBe(15);
+
+    const invRes = await request(app)
+      .get('/api/inventario')
+      .set('Authorization', `Bearer ${vendedorToken}`);
+
+    expect(invRes.status).toBe(200);
+    expect(invRes.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: 'CAM-NEG-M', stock: 10, stock_minimo: 10 }),
+        expect.objectContaining({ sku: 'CAM-BLA-M', stock: 10, stock_minimo: 10 }),
+        expect.objectContaining({ sku: 'JEA-AZU-32', stock: 30, stock_minimo: 5 }),
+        expect.objectContaining({ sku: 'CHA-AZU-L', stock: 15, stock_minimo: 3 }),
+      ])
+    );
+
+    const prodInactivo = await pool.query(`
+      INSERT INTO producto (nombre, descripcion, precio, stock_minimo, activo, id_categoria)
+      VALUES ('Producto Inactivo Prueba', 'No debe alertar', 50000, 5, FALSE, 1)
+      RETURNING id_producto
+    `);
+    const idProdInactivo = prodInactivo.rows[0].id_producto;
+
+    const varInactiva = await pool.query(`
+      INSERT INTO variante_producto (sku, stock, id_producto, id_talla, id_color)
+      VALUES ('INA-PRU-S', 0, $1, 2, 1)
+      RETURNING id_variante
+    `, [idProdInactivo]);
+    const idVarInactiva = varInactiva.rows[0].id_variante;
+
+    try {
+      const alertasRes = await request(app)
+        .get('/api/inventario/alertas')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(alertasRes.status).toBe(200);
+      const skusAlerta = alertasRes.body.map(a => a.sku);
+
+      expect(skusAlerta).toEqual(expect.arrayContaining(['CAM-NEG-M', 'CAM-BLA-M']));
+      expect(skusAlerta).not.toContain('JEA-AZU-32');
+      expect(skusAlerta).not.toContain('CHA-AZU-L');
+      expect(skusAlerta).not.toContain('INA-PRU-S');
+    } finally {
+      await pool.query('DELETE FROM variante_producto WHERE id_variante = $1', [idVarInactiva]);
+      await pool.query('DELETE FROM producto WHERE id_producto = $1', [idProdInactivo]);
+    }
+  });
+});
+
 describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
   test('MIG-05: actualiza base previa con carrito y clientes legados, conserva historial y es idempotente', async () => {
     const migracion005Path = path.resolve(
@@ -367,7 +442,6 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
     );
     const migracion005Sql = fs.readFileSync(migracion005Path, 'utf8');
 
-    // Simular estado previo a la migración 005: CHECK con 'cliente' y tablas de carrito
     await pool.query(`
       ALTER TABLE usuario DROP CONSTRAINT IF EXISTS usuario_rol_check;
       ALTER TABLE usuario
@@ -388,7 +462,6 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
     `);
 
     try {
-      // 1. Cliente con historial operativo y sesión activa
       const resClienteHist = await pool.query(`
         INSERT INTO usuario (nombre, correo, contrasena_hash, rol)
         VALUES ('Cliente Historico', 'cliente.hist@atelier.com', crypt('123456', gen_salt('bf')), 'cliente')
@@ -408,7 +481,6 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
       `, [clienteHistId]);
       const pedidoHistId = resPedidoHist.rows[0].id_pedido;
 
-      // 2. Cliente sin historial, con sesión activa y carrito legado
       const resClienteSin = await pool.query(`
         INSERT INTO usuario (nombre, correo, contrasena_hash, rol)
         VALUES ('Cliente Sin Historial', 'cliente.sin@atelier.com', crypt('123456', gen_salt('bf')), 'cliente')
@@ -432,10 +504,8 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
         VALUES (1, $1, $2)
       `, [resCarrito.rows[0].id_carrito, varianteA]);
 
-      // 3. Ejecutar migración 005 por primera vez
       await pool.query(migracion005Sql);
 
-      // Verificar que las tablas de carrito fueron eliminadas
       const tablas = await pool.query(`
         SELECT
           to_regclass('public.item_carrito') AS item_carrito,
@@ -446,14 +516,12 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
         carrito_compra: null
       });
 
-      // Verificar que el cliente sin historial fue retirado (y su sesión por ON DELETE CASCADE)
       const sinHist = await pool.query(
         'SELECT id_usuario FROM usuario WHERE id_usuario = $1',
         [clienteSinId]
       );
       expect(sinHist.rows).toHaveLength(0);
 
-      // Verificar que el cliente con historial y su pedido se conservan, pero su sesión quedó revocada
       const conHist = await pool.query(
         'SELECT id_usuario, rol FROM usuario WHERE id_usuario = $1',
         [clienteHistId]
@@ -473,13 +541,11 @@ describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
       expect(sesionRevocada.rows).toHaveLength(1);
       expect(sesionRevocada.rows[0].fecha_revocacion).not.toBeNull();
 
-      // Verificar que el acceso legado está bloqueado en /api/auth/login
       const loginLegado = await request(app)
         .post('/api/auth/login')
         .send({ correo: 'cliente.hist@atelier.com', contrasena: '123456' });
       expect(loginLegado.status).toBe(401);
 
-      // 4. Ejecutar migración 005 por segunda vez (idempotencia)
       await expect(pool.query(migracion005Sql)).resolves.toBeDefined();
 
       const pedidoTrasReejecucion = await pool.query(

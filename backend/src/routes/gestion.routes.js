@@ -1,0 +1,32 @@
+const { Router } = require('express');
+const rateLimit = require('express-rate-limit');
+const { autenticar, permitirRoles } = require('../middleware/auth');
+const {
+  getProductosConStock,
+  getInventario,
+  getAlertasStockBajo,
+} = require('../controllers/productoController');
+
+const router = Router();
+
+// Limita a máximo 100 solicitudes por IP cada 15 minutos
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones, intenta más tarde' },
+});
+
+const autorizarConsulta = [
+  limiter,
+  autenticar,
+  permitirRoles('administrador', 'vendedor'),
+];
+
+// Rutas protegidas por sesión y rol (sin middleware global sobre '/')
+router.get('/productos', ...autorizarConsulta, getProductosConStock);
+router.get('/inventario', ...autorizarConsulta, getInventario);
+router.get('/inventario/alertas', ...autorizarConsulta, getAlertasStockBajo);
+
+module.exports = router;
