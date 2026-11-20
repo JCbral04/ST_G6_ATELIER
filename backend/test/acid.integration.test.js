@@ -25,6 +25,7 @@ let varianteB;
 let adminToken;
 let vendedorToken;
 let adminId;
+let vendedorId;
 
 async function login(correo) {
   const response = await request(app)
@@ -118,6 +119,7 @@ beforeEach(async () => {
   const admin = await login('admin@atelier.com');
 
   vendedorToken = vendedor.token;
+  vendedorId = vendedor.usuario.id_usuario;
   adminToken = admin.token;
   adminId = admin.usuario.id_usuario;
 });
@@ -163,10 +165,6 @@ describe('Issue #28 — Integridad transaccional ACID', () => {
   });
 
   test('ACID-02: fallo intermedio revierte toda la venta', async () => {
-
-    // La secuencia permite demostrar que el fallo ocurrió
-    // después de que se insertó y descontó el primer ítem.
-    // nextval no se revierte con el rollback de PostgreSQL.
     await pool.query(`
       CREATE SEQUENCE acid_rollback_witness
     `);
@@ -344,7 +342,6 @@ describe('Issue #28 — Integridad transaccional ACID', () => {
       ])
     );
 
-    // La cancelación duplicada no debe devolver stock otra vez.
     const duplicada = await request(app)
       .post(`/api/pedidos/${idPedido}/cancelar`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -357,5 +354,81 @@ describe('Issue #28 — Integridad transaccional ACID', () => {
 
     const datos = await estadoTransaccional();
     expect(datos.movimientos).toBe(2);
+  });
+});
+
+describe('Issue #10 / PR #15 — Catálogo de productos, inventario y alertas (RF-06, RF-09, RF-10)', () => {
+
+  test('CAT-01: los tres endpoints GET rechazan peticiones sin sesión (401)', async () => {
+    const rutas = ['/api/productos', '/api/inventario', '/api/inventario/alertas'];
+
+    for (const ruta of rutas) {
+      const response = await request(app).get(ruta);
+      expect(response.status).toBe(401);
+    }
+  });
+
+  test('CAT-02: personal autenticado consulta productos, inventario y alertas del seed (200) excluyendo inactivos', async () => {
+    const prodRes = await request(app)
+      .get('/api/productos')
+      .set('Authorization', `Bearer ${vendedorToken}`);
+
+    expect(prodRes.status).toBe(200);
+    const camiseta = prodRes.body.find(p => p.producto === 'Camiseta básica algodón');
+    const jean = prodRes.body.find(p => p.producto === 'Jean clásico azul');
+    const chaqueta = prodRes.body.find(p => p.producto === 'Chaqueta denim');
+
+    expect(camiseta).toBeDefined();
+    expect(Number(camiseta.stock_total)).toBe(20);
+    expect(jean).toBeDefined();
+    expect(Number(jean.stock_total)).toBe(30);
+    expect(chaqueta).toBeDefined();
+    expect(Number(chaqueta.stock_total)).toBe(15);
+
+    const invRes = await request(app)
+      .get('/api/inventario')
+      .set('Authorization', `Bearer ${vendedorToken}`);
+
+    expect(invRes.status).toBe(200);
+    expect(invRes.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: 'CAM-NEG-M', stock: 10, stock_minimo: 10 }),
+        expect.objectContaining({ sku: 'CAM-BLA-M', stock: 10, stock_minimo: 10 }),
+        expect.objectContaining({ sku: 'JEA-AZU-32', stock: 30, stock_minimo: 5 }),
+        expect.objectContaining({ sku: 'CHA-AZU-L', stock: 15, stock_minimo: 3 }),
+      ])
+    );
+
+    // Insertar producto inactivo con stock bajo para verificar que no aparece en alertas ni listados
+    const prodInactivo = await pool.query(`
+      INSERT INTO producto (nombre, descripcion, precio, stock_minimo, activo, id_categoria)
+      VALUES ('Producto Inactivo Prueba', 'No debe alertar', 50000, 5, FALSE, 1)
+      RETURNING id_producto
+    `);
+    const idProdInactivo = prodInactivo.rows[0].id_producto;
+
+    const varInactiva = await pool.query(`
+      INSERT INTO variante_producto (sku, stock, id_producto, id_talla, id_color)
+      VALUES ('INA-PRU-S', 0, $1, 2, 1)
+      RETURNING id_variante
+    `, [idProdInactivo]);
+    const idVarInactiva = varInactiva.rows[0].id_variante;
+
+    try {
+      const alertasRes = await request(app)
+        .get('/api/inventario/alertas')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(alertasRes.status).toBe(200);
+      const skusAlerta = alertasRes.body.map(a => a.sku);
+
+      expect(skusAlerta).toEqual(expect.arrayContaining(['CAM-NEG-M', 'CAM-BLA-M']));
+      expect(skusAlerta).not.toContain('JEA-AZU-32');
+      expect(skusAlerta).not.toContain('CHA-AZU-L');
+      expect(skusAlerta).not.toContain('INA-PRU-S');
+    } finally {
+      await pool.query('DELETE FROM variante_producto WHERE id_variante = $1', [idVarInactiva]);
+      await pool.query('DELETE FROM producto WHERE id_producto = $1', [idProdInactivo]);
+    }
   });
 });
