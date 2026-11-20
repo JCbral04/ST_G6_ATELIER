@@ -473,17 +473,14 @@ describe('Issue #27 — Bitácora de auditoría de operaciones críticas (RNF-09
   test('AUD-04: consulta GET /api/auditoria valida sesion (401), rol (403/200) y filtros', async () => {
     await vender([{ id_variante: varianteA, cantidad: 1 }]);
 
-    // Sin sesión -> 401
     const sinSesion = await request(app).get('/api/auditoria');
     expect(sinSesion.status).toBe(401);
 
-    // Como vendedor -> 403
     const comoVendedor = await request(app)
       .get('/api/auditoria')
       .set('Authorization', `Bearer ${vendedorToken}`);
     expect(comoVendedor.status).toBe(403);
 
-    // Como administrador -> 200
     const comoAdmin = await request(app)
       .get('/api/auditoria')
       .set('Authorization', `Bearer ${adminToken}`);
@@ -495,21 +492,18 @@ describe('Issue #27 — Bitácora de auditoría de operaciones críticas (RNF-09
       entidad: 'pedido'
     });
 
-    // Filtro por entidad sin coincidencias
     const filtroEntidad = await request(app)
       .get('/api/auditoria?entidad=movimiento_inventario')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(filtroEntidad.status).toBe(200);
     expect(filtroEntidad.body).toEqual([]);
 
-    // Filtro por rango de fechas futuro -> vacío
     const filtroFechaFutura = await request(app)
       .get('/api/auditoria?fecha_desde=2099-01-01&fecha_hasta=2099-12-31')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(filtroFechaFutura.status).toBe(200);
     expect(filtroFechaFutura.body).toEqual([]);
 
-    // Filtro por fecha de hoy -> devuelve el registro
     const hoy = new Date().toISOString().slice(0, 10);
     const filtroHoy = await request(app)
       .get(`/api/auditoria?fecha_desde=${hoy}&fecha_hasta=${hoy}`)
@@ -519,7 +513,6 @@ describe('Issue #27 — Bitácora de auditoría de operaciones críticas (RNF-09
   });
 
   test('AUD-05: movimientos de inventario requieren sesion (401) e ignoran id_usuario del body', async () => {
-    // Sin sesión -> 401 y sin cambios en stock ni auditoría
     const sinSesion = await request(app)
       .post('/api/inventario/movimientos')
       .send({
@@ -532,7 +525,6 @@ describe('Issue #27 — Bitácora de auditoría de operaciones críticas (RNF-09
     expect(sinSesion.status).toBe(401);
     expect(await stock(varianteA)).toBe(10);
 
-    // Autenticado como vendedor enviando id_usuario de admin en el body -> atribuye al vendedor real
     const autorizado = await request(app)
       .post('/api/inventario/movimientos')
       .set('Authorization', `Bearer ${vendedorToken}`)
@@ -560,5 +552,60 @@ describe('Issue #27 — Bitácora de auditoría de operaciones críticas (RNF-09
       entidad: 'movimiento_inventario',
       id_entidad: autorizado.body.movimiento.id_movimiento
     });
+  });
+
+  test('AUD-06: rol de aplicacion permite SELECT/INSERT en auditoria pero bloquea UPDATE y DELETE', async () => {
+    await pool.query(`
+      DROP ROLE IF EXISTS test_atelier_app_aud;
+      CREATE ROLE test_atelier_app_aud NOLOGIN;
+      GRANT USAGE ON SCHEMA public TO test_atelier_app_aud;
+      GRANT SELECT, INSERT ON TABLE auditoria TO test_atelier_app_aud;
+      GRANT USAGE, SELECT ON SEQUENCE auditoria_id_seq TO test_atelier_app_aud;
+      REVOKE UPDATE, DELETE, TRUNCATE ON TABLE auditoria FROM test_atelier_app_aud;
+    `);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE test_atelier_app_aud');
+
+      const ins = await client.query(
+        `INSERT INTO auditoria (id_usuario, accion, entidad, id_entidad, detalle)
+         VALUES ($1, 'CREAR', 'pedido', 1, '{}'::jsonb)
+         RETURNING id`,
+        [vendedorId]
+      );
+      expect(ins.rows).toHaveLength(1);
+      const idAud = ins.rows[0].id;
+
+      const sel = await client.query('SELECT id FROM auditoria WHERE id = $1', [idAud]);
+      expect(sel.rows).toHaveLength(1);
+
+      await client.query('SAVEPOINT sp_update');
+      await expect(
+        client.query("UPDATE auditoria SET accion = 'ANULAR' WHERE id = $1", [idAud])
+      ).rejects.toMatchObject({ code: '42501' });
+      await client.query('ROLLBACK TO SAVEPOINT sp_update');
+
+      await client.query('SAVEPOINT sp_delete');
+      await expect(
+        client.query('DELETE FROM auditoria WHERE id = $1', [idAud])
+      ).rejects.toMatchObject({ code: '42501' });
+      await client.query('ROLLBACK TO SAVEPOINT sp_delete');
+
+      await client.query('RESET ROLE');
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+      await pool.query(`
+        REVOKE ALL PRIVILEGES ON TABLE auditoria FROM test_atelier_app_aud;
+        REVOKE ALL PRIVILEGES ON SEQUENCE auditoria_id_seq FROM test_atelier_app_aud;
+        REVOKE USAGE ON SCHEMA public FROM test_atelier_app_aud;
+        DROP ROLE IF EXISTS test_atelier_app_aud;
+      `);
+    }
   });
 });
