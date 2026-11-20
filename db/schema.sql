@@ -39,7 +39,7 @@ CREATE TABLE usuario (
     correo           VARCHAR(120) NOT NULL UNIQUE,
     contrasena_hash  VARCHAR(255) NOT NULL,          -- cifrado con pgcrypto (Fase 4)
     rol              VARCHAR(20)  NOT NULL
-        CHECK (rol IN ('cliente', 'vendedor', 'administrador')),
+        CHECK (rol IN ('vendedor', 'administrador')),
     fecha_registro   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -125,32 +125,14 @@ CREATE TABLE detalle_compra (
 -- =============================================================
 
 -- Venta: al agregar un detalle de pedido, descuenta stock
-CREATE OR REPLACE FUNCTION fn_stock_venta() RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE variante_producto
-    SET stock = stock - NEW.cantidad
-    WHERE id_variante = NEW.id_variante;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION fn_stock_venta() RETURNS TRIGGER AS $$ BEGIN UPDATE variante_producto SET stock = stock - NEW.cantidad WHERE id_variante = NEW.id_variante; RETURN NEW; END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_stock_venta
     AFTER INSERT ON detalle_pedido
     FOR EACH ROW EXECUTE FUNCTION fn_stock_venta();
 
 -- Compra: al pasar a estado 'recibida', incrementa stock
-CREATE OR REPLACE FUNCTION fn_stock_compra() RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.estado <> 'recibida' AND NEW.estado = 'recibida' THEN
-        UPDATE variante_producto v
-        SET stock = stock + dc.cantidad
-        FROM detalle_compra dc
-        WHERE dc.id_compra = NEW.id_compra
-          AND v.id_variante = dc.id_variante;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION fn_stock_compra() RETURNS TRIGGER AS $$ BEGIN IF OLD.estado <> 'recibida' AND NEW.estado = 'recibida' THEN UPDATE variante_producto v SET stock = stock + dc.cantidad FROM detalle_compra dc WHERE dc.id_compra = NEW.id_compra AND v.id_variante = dc.id_variante; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_stock_compra
     AFTER UPDATE OF estado ON compra
