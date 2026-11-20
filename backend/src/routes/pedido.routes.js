@@ -4,6 +4,29 @@ const rateLimit = require('express-rate-limit');
 const { autenticar, permitirRoles } = require('../middleware/auth');
 const router = Router();
 
+const MAX_INT = 2147483647;
+const MAX_ITEMS = 100;
+const MAX_TOTAL_CENTS = 999999999999n;
+
+const enteroPositivo = (n) =>
+  Number.isSafeInteger(n) && n > 0 && n <= MAX_INT;
+
+function precioCentavos(value) {
+  const match = /^(\d{1,8})(?:\.(\d{1,2}))?$/.exec(String(value));
+  if (!match) throw new Error('Precio inválido en base de datos');
+
+  const cents =
+    BigInt(match[1]) * 100n +
+    BigInt((match[2] || '').padEnd(2, '0'));
+
+  if (cents <= 0n) throw new Error('Precio no positivo');
+  return cents;
+}
+
+function dinero(cents) {
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+}
+
 // Límite de peticiones por IP (seguridad: mitigación de abuso/DoS) resueltos comentarios de codeQL y dependabot sobre las fallas
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // ventana de 15 minutos
@@ -43,7 +66,7 @@ router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) 
   const idPedido = Number(req.params.id);
 
   if (!/^[1-9]\d*$/.test(req.params.id) ||
-      !Number.isSafeInteger(idPedido)) {
+      !enteroPositivo(idPedido)) {
     return res.status(400).json({
       error: 'El ID del pedido debe ser un entero positivo'
     });
@@ -86,26 +109,42 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
   const id_usuario = req.usuario.id_usuario;
 
   // Validaciones de campos obligatorios IMPORTANTE
-  if (!Array.isArray(items) || items.length === 0) {
+  if (
+    !Array.isArray(items) ||
+    items.length === 0 ||
+    items.length > MAX_ITEMS
+  ) {
     return res.status(400).json({
-      error: 'Debes incluir al menos un ítem (id_variante, cantidad)',
+      error: 'Debes incluir entre 1 y 100 ítems',
     });
   }
+  const variantesVistas = new Set();
+
   for (const item of items) {
     if (
       item === null ||
       typeof item !== 'object' ||
       Array.isArray(item) ||
-      !Number.isSafeInteger(item.id_variante) ||
-      item.id_variante <= 0 ||
-      !Number.isSafeInteger(item.cantidad) ||
-      item.cantidad <= 0
+      !enteroPositivo(item.id_variante) ||
+      !enteroPositivo(item.cantidad)
     ) {
       return res.status(400).json({
-        error: 'Cada ítem debe incluir id_variante y cantidad como enteros positivos'
+        error: 'Cada ítem requiere identificador y cantidad enteros positivos válidos'
       });
     }
+
+    if (variantesVistas.has(item.id_variante)) {
+      return res.status(400).json({
+        error: `La variante ${item.id_variante} está duplicada`
+      });
+    }
+
+    variantesVistas.add(item.id_variante);
   }
+
+  const itemsOrdenados = [...items].sort(
+    (a, b) => a.id_variante - b.id_variante
+  );
 
   let client;
 
@@ -124,37 +163,71 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
     }
 
     // 2. Validar stock y tomar el precio real de la BD (RN-01, RN-08)
-    let total = 0;
+    let totalCentavos = 0n;
     const lineas = [];
-    for (const item of items) {
+
+    for (const item of itemsOrdenados) {
       const variante = await client.query(
-        `SELECT v.id_variante, v.sku, v.stock, p.precio
+        `SELECT v.id_variante, v.sku, v.stock, v.id_producto
          FROM variante_producto v
-         JOIN producto p ON p.id_producto = v.id_producto
          WHERE v.id_variante = $1
-         FOR UPDATE`,
+         FOR UPDATE OF v`,
         [item.id_variante]
       );
       if (variante.rows.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(404).json({ error: `La variante ${item.id_variante} no existe` });
+        return res.status(404).json({ error: `La variante ${item.id_variante} no existe o está inactiva` });
       }
       const v = variante.rows[0];
+
+      // La función SQL bloquea el producto hasta finalizar
+      // la transacción sin conceder UPDATE sobre el catálogo.
+      const producto = await client.query(
+        'SELECT public.precio_producto_activo($1) AS precio',
+        [v.id_producto]
+      );
+
+      const precioActivo = producto.rows[0].precio;
+
+      if (precioActivo === null) {
+        await client.query('ROLLBACK');
+
+        return res.status(404).json({
+          error: `La variante ${item.id_variante} pertenece a un producto inactivo`
+        });
+      }
+
       if (v.stock < item.cantidad) {
         await client.query('ROLLBACK');
         return res.status(409).json({
           error: `Stock insuficiente para ${v.sku}: disponible ${v.stock}, solicitado ${item.cantidad}`,
         });
       }
-      const subtotal = Number(v.precio) * item.cantidad;
-      total += subtotal;
-      lineas.push({ id_variante: v.id_variante, cantidad: item.cantidad, precio: v.precio, subtotal });
+      const precio = precioCentavos(precioActivo);
+      const subtotal = precio * BigInt(item.cantidad);
+
+      totalCentavos += subtotal;
+
+      if (totalCentavos > MAX_TOTAL_CENTS) {
+        await client.query('ROLLBACK');
+
+        return res.status(400).json({
+          error: 'El total de la venta supera el límite permitido'
+        });
+      }
+
+      lineas.push({
+        id_variante: v.id_variante,
+        cantidad: item.cantidad,
+        precio: dinero(precio),
+        subtotal: dinero(subtotal)
+      });
     }
 
     // 3. Crear el pedido en estado pendiente
     const pedido = await client.query(
       `INSERT INTO pedido (id_usuario, total) VALUES ($1, $2) RETURNING id_pedido`,
-      [id_usuario, total]
+      [id_usuario, dinero(totalCentavos)]
     );
     const idPedido = pedido.rows[0].id_pedido;
 
@@ -167,12 +240,27 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
       );
     }
 
+    // El trigger ya descontó el stock.
+    // Registrar únicamente la trazabilidad de la salida.
+    await client.query(
+      `INSERT INTO movimiento_inventario
+         (tipo, cantidad, motivo, id_variante, id_usuario)
+       SELECT 'salida',
+              d.cantidad,
+              $2,
+              d.id_variante,
+              $3
+       FROM detalle_pedido d
+       WHERE d.id_pedido = $1`,
+      [idPedido, `Registro de venta #${idPedido}`, id_usuario]
+    );
+
     await client.query('COMMIT');
     res.status(201).json({
       mensaje: 'Venta registrada correctamente',
       id_pedido: idPedido,
       estado: 'pendiente',
-      total,
+      total: Number(dinero(totalCentavos)),
       items: lineas.length,
     });
   } catch (err) {
@@ -205,13 +293,16 @@ router.post(
   const idPedido = Number(req.params.id);
 
   // Validar identificadores
-  if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
+  if (
+    !/^[1-9]\d*$/.test(req.params.id) ||
+    !enteroPositivo(idPedido)
+  ) {
     return res.status(400).json({
       error: 'El ID del pedido debe ser un entero positivo'
     });
   }
 
-  if (!Number.isSafeInteger(id_usuario) || id_usuario <= 0) {
+  if (!enteroPositivo(id_usuario)) {
     return res.status(400).json({
       error: 'El id_usuario debe ser un entero positivo'
     });
@@ -260,6 +351,36 @@ router.post(
 
       return res.status(409).json({
         error: 'No se puede anular una venta despachada o entregada'
+      });
+    }
+
+    // Bloquear variantes en orden determinista y validar
+    // la restitución acumulada de los detalles históricos.
+    const devoluciones = await client.query(
+      `SELECT v.id_variante, v.stock, d.cantidad_total
+       FROM variante_producto v
+       JOIN (
+         SELECT id_variante, SUM(cantidad) AS cantidad_total
+         FROM detalle_pedido
+         WHERE id_pedido = $1
+         GROUP BY id_variante
+       ) d ON d.id_variante = v.id_variante
+       ORDER BY v.id_variante
+       FOR UPDATE OF v`,
+      [idPedido]
+    );
+
+    if (
+      devoluciones.rows.length === 0 ||
+      devoluciones.rows.some(
+        v => BigInt(v.stock) + BigInt(v.cantidad_total) > BigInt(MAX_INT)
+      )
+    ) {
+      await client.query('ROLLBACK');
+      transaccionIniciada = false;
+
+      return res.status(409).json({
+        error: 'La devolución no es válida o supera el stock máximo'
       });
     }
 
