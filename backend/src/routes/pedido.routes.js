@@ -2,12 +2,12 @@ const { Router } = require('express');
 const { pool } = require('../config/db');
 const rateLimit = require('express-rate-limit');
 const { autenticar, permitirRoles } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 const router = Router();
 
-// Límite de peticiones por IP (seguridad: mitigación de abuso/DoS) resueltos comentarios de codeQL y dependabot sobre las fallas
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // ventana de 15 minutos
-  max: 100,                  // máximo 100 peticiones por IP por ventana
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas peticiones, intenta más tarde' },
@@ -16,22 +16,20 @@ const limiter = rateLimit({
 router.use(limiter);
 router.use(autenticar);
 
-//En caso de que tengamos X o Y problema de seguridad o vulnerabilidad en el codigo codeQL nos lo dira :))
-
 // GET /api/pedidos — historial de ventas (RF-13)
 router.get('/', permitirRoles('vendedor', 'administrador'), async (req, res) => {
   try {
-  const esAdmin = req.usuario.rol === 'administrador';
+    const esAdmin = req.usuario.rol === 'administrador';
 
-  const result = await pool.query(
-    `SELECT p.id_pedido, p.fecha, p.estado, p.total,
-            u.nombre AS usuario
-    FROM pedido p
-    JOIN usuario u ON u.id_usuario = p.id_usuario
-    WHERE ($1::boolean OR p.id_usuario = $2)
-    ORDER BY p.fecha DESC`,
-    [esAdmin, req.usuario.id_usuario]
-  );
+    const result = await pool.query(
+      `SELECT p.id_pedido, p.fecha, p.estado, p.total,
+              u.nombre AS usuario
+       FROM pedido p
+       JOIN usuario u ON u.id_usuario = p.id_usuario
+       WHERE ($1::boolean OR p.id_usuario = $2)
+       ORDER BY p.fecha DESC`,
+      [esAdmin, req.usuario.id_usuario]
+    );
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Error al consultar los pedidos' });
@@ -54,10 +52,10 @@ router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) 
     const pedido = await pool.query(
       `SELECT p.id_pedido, p.fecha, p.estado, p.total,
               u.nombre AS usuario
-      FROM pedido p
-      JOIN usuario u ON u.id_usuario = p.id_usuario
-      WHERE p.id_pedido = $1
-        AND ($2::boolean OR p.id_usuario = $3)`,
+       FROM pedido p
+       JOIN usuario u ON u.id_usuario = p.id_usuario
+       WHERE p.id_pedido = $1
+         AND ($2::boolean OR p.id_usuario = $3)`,
       [idPedido, esAdmin, req.usuario.id_usuario]
     );
     if (pedido.rows.length === 0) {
@@ -78,14 +76,11 @@ router.get('/:id', permitirRoles('vendedor', 'administrador'), async (req, res) 
   }
 });
 
-// metodo POST /api/pedidos — registrar venta (cunple con los RF-12, RN-01, RN-02, RNF-08)
-// Body: { "items": [{ "id_variante": 3, "cantidad": 2 }] }
-// Requiere Authorization: Bearer <token>
+// POST /api/pedidos — registrar venta (RF-12, RN-01, RN-02, RNF-08, RNF-09)
 router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) => {
   const { items } = req.body || {};
   const id_usuario = req.usuario.id_usuario;
 
-  // Validaciones de campos obligatorios IMPORTANTE
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({
       error: 'Debes incluir al menos un ítem (id_variante, cantidad)',
@@ -113,7 +108,6 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
     client = await pool.connect();
     await client.query('BEGIN');
 
-    // 1. Validar usuario
     const usuario = await client.query(
       'SELECT id_usuario FROM usuario WHERE id_usuario = $1',
       [id_usuario]
@@ -123,7 +117,6 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
       return res.status(404).json({ error: 'El usuario no existe' });
     }
 
-    // 2. Validar stock y tomar el precio real de la BD (RN-01, RN-08)
     let total = 0;
     const lineas = [];
     for (const item of items) {
@@ -151,14 +144,12 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
       lineas.push({ id_variante: v.id_variante, cantidad: item.cantidad, precio: v.precio, subtotal });
     }
 
-    // 3. Crear el pedido en estado pendiente
     const pedido = await client.query(
       `INSERT INTO pedido (id_usuario, total) VALUES ($1, $2) RETURNING id_pedido`,
       [id_usuario, total]
     );
     const idPedido = pedido.rows[0].id_pedido;
 
-    // 4. Insertar el detalle — el trigger trg_stock_venta descuenta el stock (RN-02)
     for (const l of lineas) {
       await client.query(
         `INSERT INTO detalle_pedido (id_pedido, id_variante, cantidad, precio_unitario, subtotal)
@@ -166,6 +157,15 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
         [idPedido, l.id_variante, l.cantidad, l.precio, l.subtotal]
       );
     }
+
+    // Registrar creación de venta en auditoría (RNF-09)
+    await registrarAuditoria(client, {
+      id_usuario,
+      accion: 'CREAR',
+      entidad: 'pedido',
+      id_entidad: idPedido,
+      detalle: { total, items: lineas },
+    });
 
     await client.query('COMMIT');
     res.status(201).json({
@@ -196,128 +196,134 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
   }
 });
 
-// POST /api/pedidos/:id/cancelar — anular venta y devolver stock (Issue #25)
+// POST /api/pedidos/:id/cancelar — anular venta y devolver stock (Issue #25, RNF-09)
 router.post(
   '/:id/cancelar',
   permitirRoles('administrador'),
   async (req, res) => {
-  const id_usuario = req.usuario.id_usuario;
-  const idPedido = Number(req.params.id);
+    const id_usuario = req.usuario.id_usuario;
+    const idPedido = Number(req.params.id);
 
-  // Validar identificadores
-  if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
-    return res.status(400).json({
-      error: 'El ID del pedido debe ser un entero positivo'
-    });
-  }
-
-  if (!Number.isSafeInteger(id_usuario) || id_usuario <= 0) {
-    return res.status(400).json({
-      error: 'El id_usuario debe ser un entero positivo'
-    });
-  }
-
-  let client;
-  let transaccionIniciada = false;
-
-  try {
-    client = await pool.connect();
-
-    await client.query('BEGIN');
-    transaccionIniciada = true;
-
-
-    // 1. Bloquear el pedido para evitar cancelaciones concurrentes
-    const pedido = await client.query(
-      `SELECT id_pedido, estado
-       FROM pedido
-       WHERE id_pedido = $1
-       FOR UPDATE`,
-      [idPedido]
-    );
-
-    if (pedido.rows.length === 0) {
-      await client.query('ROLLBACK');
-      transaccionIniciada = false;
-
-      return res.status(404).json({
-        error: 'Pedido no encontrado'
+    if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
+      return res.status(400).json({
+        error: 'El ID del pedido debe ser un entero positivo'
       });
     }
 
-    if (pedido.rows[0].estado === 'cancelado') {
-      await client.query('ROLLBACK');
-      transaccionIniciada = false;
-
-      return res.status(409).json({
-        error: 'La venta ya está anulada'
+    if (!Number.isSafeInteger(id_usuario) || id_usuario <= 0) {
+      return res.status(400).json({
+        error: 'El id_usuario debe ser un entero positivo'
       });
     }
 
-    if (!['pendiente', 'confirmado'].includes(pedido.rows[0].estado)) {
-      await client.query('ROLLBACK');
-      transaccionIniciada = false;
+    let client;
+    let transaccionIniciada = false;
 
-      return res.status(409).json({
-        error: 'No se puede anular una venta despachada o entregada'
-      });
-    }
+    try {
+      client = await pool.connect();
 
-    // 2. Actualizar estado: el trigger devuelve automáticamente el stock
-    await client.query(
-      `UPDATE pedido
-       SET estado = 'cancelado'
-       WHERE id_pedido = $1`,
-      [idPedido]
-    );
+      await client.query('BEGIN');
+      transaccionIniciada = true;
 
-    // 3. Registrar los movimientos de devolución
-    await client.query(
-      `INSERT INTO movimiento_inventario
-         (tipo, cantidad, motivo, id_variante, id_usuario)
-       SELECT 'entrada',
-              d.cantidad,
-              $2,
-              d.id_variante,
-              $3
-       FROM detalle_pedido d
-       WHERE d.id_pedido = $1`,
-      [
-        idPedido,
-        `Anulación de la venta #${idPedido}`,
-        id_usuario
-      ]
-    );
+      const pedido = await client.query(
+        `SELECT id_pedido, estado
+         FROM pedido
+         WHERE id_pedido = $1
+         FOR UPDATE`,
+        [idPedido]
+      );
 
-    // 4. Confirmar la transacción completa
-    await client.query('COMMIT');
-    transaccionIniciada = false;
-
-    return res.status(200).json({
-      mensaje: `Venta #${idPedido} anulada; el stock fue devuelto al inventario`
-    });
-
-  } catch (err) {
-    console.error('Error al anular la venta:', err);
-
-    if (client && transaccionIniciada) {
-      try {
+      if (pedido.rows.length === 0) {
         await client.query('ROLLBACK');
-      } catch (rollbackErr) {
-        console.error('Error durante ROLLBACK:', rollbackErr);
+        transaccionIniciada = false;
+
+        return res.status(404).json({
+          error: 'Pedido no encontrado'
+        });
+      }
+
+      if (pedido.rows[0].estado === 'cancelado') {
+        await client.query('ROLLBACK');
+        transaccionIniciada = false;
+
+        return res.status(409).json({
+          error: 'La venta ya está anulada'
+        });
+      }
+
+      if (!['pendiente', 'confirmado'].includes(pedido.rows[0].estado)) {
+        await client.query('ROLLBACK');
+        transaccionIniciada = false;
+
+        return res.status(409).json({
+          error: 'No se puede anular una venta despachada o entregada'
+        });
+      }
+
+      await client.query(
+        `UPDATE pedido
+         SET estado = 'cancelado'
+         WHERE id_pedido = $1`,
+        [idPedido]
+      );
+
+      await client.query(
+        `INSERT INTO movimiento_inventario
+           (tipo, cantidad, motivo, id_variante, id_usuario)
+         SELECT 'entrada',
+                d.cantidad,
+                $2,
+                d.id_variante,
+                $3
+         FROM detalle_pedido d
+         WHERE d.id_pedido = $1`,
+        [
+          idPedido,
+          `Anulación de la venta #${idPedido}`,
+          id_usuario
+        ]
+      );
+
+      // Registrar anulación de venta en auditoría (RNF-09)
+      await registrarAuditoria(client, {
+        id_usuario,
+        accion: 'ANULAR',
+        entidad: 'pedido',
+        id_entidad: idPedido,
+        detalle: {
+          estado_anterior: pedido.rows[0].estado,
+          estado_nuevo: 'cancelado',
+        },
+      });
+
+      await client.query('COMMIT');
+      transaccionIniciada = false;
+
+      return res.status(200).json({
+        mensaje: `Venta #${idPedido} anulada; el stock fue devuelto al inventario`
+      });
+
+    } catch (err) {
+      console.error('Error al anular la venta:', err);
+
+      if (client && transaccionIniciada) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackErr) {
+          console.error('Error durante ROLLBACK:', rollbackErr);
+        }
+      }
+
+      return res.status(500).json({
+        error: 'No se pudo completar la anulación de la venta'
+      });
+
+    } finally {
+      if (client) {
+        client.release();
       }
     }
-
-    return res.status(500).json({
-      error: 'No se pudo completar la anulación de la venta'
-    });
-
-  } finally {
-    if (client) {
-      client.release();
-    }
   }
-});
-
+);
 
 module.exports = router;

@@ -33,6 +33,19 @@ docker compose down
 
 `down` conserva los datos. No utilizar `down -v` sobre datos que deban conservarse. Si falla la inicialización, inspeccionar los logs antes de reintentar; un volumen parcialmente creado necesita reparación o recreación explícita de un entorno descartable. Cambiar las contraseñas en `.env` no actualiza las contraseñas ya almacenadas en el volumen.
 
+### Migración `003_auditoria.sql` y permisos en volúmenes existentes
+
+En volúmenes de PostgreSQL (`atelier_demo`) inicializados antes de incorporar `RNF-09`, aplicar la migración de auditoría como superusuario (`postgres`) y asignar los privilegios mínimos al rol de aplicación (`atelier_app`, revocando `UPDATE`, `DELETE` y `TRUNCATE` sobre `auditoria`):
+
+```bash
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d atelier_demo < db/migrations/003_auditoria.sql
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d atelier_demo <<'SQL'
+GRANT SELECT, INSERT ON TABLE auditoria TO atelier_app;
+GRANT USAGE, SELECT ON SEQUENCE auditoria_id_seq TO atelier_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE auditoria FROM atelier_app;
+SQL
+```
+
 ## Alcance
 
 Los Dockerfiles usan versiones mayores de bases de imagen, y Python conserva los rangos de dependencias del proyecto: no se garantiza reproducibilidad bit a bit. Node 22 se propone para el contenedor; el CI existente usa Node 20. El smoke test exige predicción real, no fallback, y revisa los permisos del rol analítico. La suite ACID existente sigue siendo necesaria.

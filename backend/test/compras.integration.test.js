@@ -18,7 +18,7 @@ async function login(correo) {
   return r.body;
 }
 async function limpiar() {
-  await pool.query('TRUNCATE detalle_compra, compra, movimiento_inventario, sesion_usuario RESTART IDENTITY');
+  await pool.query('TRUNCATE auditoria, detalle_compra, compra, movimiento_inventario, sesion_usuario RESTART IDENTITY');
   await pool.query('UPDATE variante_producto SET stock = 10 WHERE id_variante IN ($1, $2)', [a, b]);
 }
 const orden = () => ({ id_proveedor: proveedor, items: [
@@ -149,5 +149,70 @@ test('COM-07: fallo de trazabilidad revierte recepción y aumento de stock', asy
     expect(await estado()).toEqual({ compras: 1, detalles: 2, movimientos: 0, a: 10, b: 10 });
   } finally {
     await pool.query('DROP TRIGGER IF EXISTS trg_test_compra_mov ON movimiento_inventario; DROP FUNCTION IF EXISTS fn_test_compra_mov();');
+  }
+});
+
+test('AUD-COM-01: creación y recepción de compra registran eventos atribuidos al administrador', async () => {
+  const r = await crear();
+  expect(r.status).toBe(201);
+  const id = r.body.id_compra;
+
+  const rec = await recibir(id);
+  expect(rec.status).toBe(200);
+
+  const eventos = await pool.query(
+    `SELECT id_usuario, accion, entidad, id_entidad, detalle
+     FROM auditoria
+     WHERE entidad = 'compra' AND id_entidad = $1
+     ORDER BY id ASC`,
+    [id]
+  );
+
+  expect(eventos.rows).toHaveLength(2);
+  expect(eventos.rows[0]).toMatchObject({
+    id_usuario: adminId,
+    accion: 'CREAR',
+    entidad: 'compra',
+    id_entidad: id,
+    detalle: {
+      id_proveedor: proveedor,
+      total: 80.8,
+      estado: 'pendiente',
+      lineas: 2
+    }
+  });
+  expect(eventos.rows[1]).toMatchObject({
+    id_usuario: adminId,
+    accion: 'RECIBIR',
+    entidad: 'compra',
+    id_entidad: id,
+    detalle: {
+      estado_anterior: 'pendiente',
+      estado_nuevo: 'recibida',
+      items_recibidos: 2
+    }
+  });
+});
+
+test('AUD-COM-02: fallo en bitácora revierte recepción de compra, movimiento y stock', async () => {
+  const r = await crear();
+  expect(r.status).toBe(201);
+  const id = r.body.id_compra;
+
+  await pool.query(`CREATE FUNCTION fn_test_compra_aud() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'FALLO_CONTROLADO_AUDITORIA_COMPRA'; END; $$;
+    CREATE TRIGGER trg_test_compra_aud BEFORE INSERT ON auditoria
+    FOR EACH ROW EXECUTE FUNCTION fn_test_compra_aud();`);
+
+  try {
+    expect((await recibir(id)).status).toBe(500);
+    const c = await pool.query('SELECT estado FROM compra WHERE id_compra = $1', [id]);
+    expect(c.rows[0].estado).toBe('pendiente');
+    expect(await estado()).toEqual({ compras: 1, detalles: 2, movimientos: 0, a: 10, b: 10 });
+
+    const aud = await pool.query("SELECT accion FROM auditoria WHERE entidad = 'compra' AND id_entidad = $1", [id]);
+    expect(aud.rows.map(row => row.accion)).toEqual(['CREAR']);
+  } finally {
+    await pool.query('DROP TRIGGER IF EXISTS trg_test_compra_aud ON auditoria; DROP FUNCTION IF EXISTS fn_test_compra_aud();');
   }
 });

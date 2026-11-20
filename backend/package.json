@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test:acid": "jest --runInBand --runTestsByPath test/acid.integration.test.js test/compras.integration.test.js"
+    "test:acid": "jest --runInBand --runTestsByPath test/acid.integration.test.js test/compras.integration.test.js test/integral.validation.test.js"
   },
   "dependencies": {
     "dotenv": "^18.0.10",
