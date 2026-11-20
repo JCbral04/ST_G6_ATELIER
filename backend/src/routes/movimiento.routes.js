@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { pool } = require('../config/db');
 const rateLimit = require('express-rate-limit');
+const { autenticar, permitirRoles } = require('../middleware/auth');
 const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = Router();
@@ -14,9 +15,10 @@ const limiter = rateLimit({
 });
 
 router.use(limiter);
+router.use(autenticar);
+router.use(permitirRoles('administrador', 'vendedor'));
 
 const TIPOS = ['entrada', 'salida'];
-const ROLES_PERMITIDOS = ['administrador', 'vendedor'];
 const MOTIVO_MAX = 200;
 
 function enteroPositivo(valor) {
@@ -76,17 +78,16 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/inventario/movimientos — ajuste manual de inventario (RNF-09)
+// POST /api/inventario/movimientos — ajuste manual de inventario autenticado (RNF-09)
 router.post('/', async (req, res) => {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
-  const idUsuario = enteroPositivo(body.id_usuario);
+  const idUsuario = req.usuario.id_usuario;
   const idVariante = enteroPositivo(body.id_variante);
   const cantidad = Number.isInteger(body.cantidad) && body.cantidad > 0 ? body.cantidad : null;
   const tipo = body.tipo;
   const motivo = typeof body.motivo === 'string' ? body.motivo.trim() : '';
 
   const errores = [];
-  if (!idUsuario) errores.push('id_usuario debe ser un número entero mayor a 0');
   if (!idVariante) errores.push('id_variante debe ser un número entero mayor a 0');
   if (!TIPOS.includes(tipo)) errores.push("tipo debe ser 'entrada' o 'salida'");
   if (!cantidad) errores.push('cantidad debe ser un número entero mayor a 0');
@@ -98,16 +99,6 @@ router.post('/', async (req, res) => {
   try {
     client = await pool.connect();
     await client.query('BEGIN');
-
-    const usuario = await client.query('SELECT rol FROM usuario WHERE id_usuario = $1', [idUsuario]);
-    if (usuario.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'El usuario no existe' });
-    }
-    if (!ROLES_PERMITIDOS.includes(usuario.rows[0].rol)) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Solo el personal de la tienda puede registrar movimientos' });
-    }
 
     const variante = await client.query(
       'SELECT sku, stock FROM variante_producto WHERE id_variante = $1 FOR UPDATE',
@@ -138,7 +129,7 @@ router.post('/', async (req, res) => {
       [tipo, cantidad, motivo, idVariante, idUsuario]
     );
 
-    // Registrar movimiento de inventario en auditoría (RNF-09)
+    // Registrar movimiento de inventario en auditoría atribuido a la sesión autenticada (RNF-09)
     await registrarAuditoria(client, {
       id_usuario: idUsuario,
       accion: 'CREAR',
