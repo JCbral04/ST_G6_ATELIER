@@ -1,0 +1,59 @@
+name: Container Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: Integracion Docker Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      COMPOSE_PROJECT_NAME: atelier-ci-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Generar configuracion de prueba
+        run: |
+          bash infrastructure/setup-env.sh
+          while IFS='=' read -r key value; do
+            case "$key" in
+              *PASSWORD|AI_INTERNAL_KEY)
+                echo "::add-mask::$value"
+                ;;
+            esac
+          done < .env
+
+      - name: Validar Docker Compose
+        run: docker compose config --quiet
+
+      - name: Construir e iniciar servicios
+        run: |
+          docker compose up -d --build \
+            --wait --wait-timeout 240
+
+      - name: Verificar contenedores
+        run: docker compose ps
+
+      - name: Ejecutar smoke tests
+        run: bash test/smoke-compose.sh
+
+      - name: Diagnostico de fallos
+        if: failure()
+        run: docker compose logs --tail=100
+
+      - name: Limpiar entorno temporal
+        if: always()
+        run: docker compose down -v --remove-orphans

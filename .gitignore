@@ -1,0 +1,4 @@
+# Configuración local de Compose
+/.env
+/.env.*
+!/.env.example
