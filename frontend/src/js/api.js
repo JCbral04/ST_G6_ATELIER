@@ -27,7 +27,7 @@
 
   A.store = {
     variantes: [], pedidos: [], compras: [], proveedores: [],
-    cart: [],
+    venta: [],
     live: {},      // recurso -> true si viene de la API
     apiOnline: false,
   };
@@ -76,9 +76,9 @@
     },
 
     // POST /api/pedidos (PR #11). En modo demo simula el trigger trg_stock_venta.
-    async registrarVenta(idUsuario, cart) {
+    async registrarVenta(idUsuario, venta) {
       const s = A.store;
-      const items = cart.map(function (l) { return { id_variante: l.id_variante, cantidad: l.cantidad }; });
+      const items = venta.map(function (l) { return { id_variante: l.id_variante, cantidad: l.cantidad }; });
 
       if (s.live.pedidos) {
         const res = await fetch(BASE + '/api/pedidos', {
@@ -93,14 +93,14 @@
       }
 
       // Demo: validar stock (RN-01) y descontar (RN-02) de forma atómica
-      for (const l of cart) {
+      for (const l of venta) {
         const v = s.variantes.find(function (x) { return x.id_variante === l.id_variante; });
         if (!v || v.stock < l.cantidad) {
           throw new Error('Stock insuficiente para ' + (v ? v.sku : l.id_variante));
         }
       }
       let total = 0;
-      cart.forEach(function (l) {
+      venta.forEach(function (l) {
         const v = s.variantes.find(function (x) { return x.id_variante === l.id_variante; });
         v.stock -= l.cantidad;
         total += v.precio * l.cantidad;
