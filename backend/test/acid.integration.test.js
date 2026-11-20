@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const express = require('express');
 const request = require('supertest');
 
@@ -399,7 +401,6 @@ describe('Issue #10 / PR #15 — Catálogo de productos, inventario y alertas (R
       ])
     );
 
-    // Insertar producto inactivo con stock bajo para verificar que no aparece en alertas ni listados
     const prodInactivo = await pool.query(`
       INSERT INTO producto (nombre, descripcion, precio, stock_minimo, activo, id_categoria)
       VALUES ('Producto Inactivo Prueba', 'No debe alertar', 50000, 5, FALSE, 1)
@@ -429,6 +430,140 @@ describe('Issue #10 / PR #15 — Catálogo de productos, inventario y alertas (R
     } finally {
       await pool.query('DELETE FROM variante_producto WHERE id_variante = $1', [idVarInactiva]);
       await pool.query('DELETE FROM producto WHERE id_producto = $1', [idProdInactivo]);
+    }
+  });
+});
+
+describe('Issue #16 — Migración 005 sobre base de datos existente', () => {
+  test('MIG-05: actualiza base previa con carrito y clientes legados, conserva historial y es idempotente', async () => {
+    const migracion005Path = path.resolve(
+      __dirname,
+      '../../db/migrations/005_eliminar_carrito_ecommerce.sql'
+    );
+    const migracion005Sql = fs.readFileSync(migracion005Path, 'utf8');
+
+    await pool.query(`
+      ALTER TABLE usuario DROP CONSTRAINT IF EXISTS usuario_rol_check;
+      ALTER TABLE usuario
+        ADD CONSTRAINT usuario_rol_check CHECK (rol IN ('cliente', 'vendedor', 'administrador'));
+
+      CREATE TABLE IF NOT EXISTS carrito_compra (
+        id_carrito SERIAL PRIMARY KEY,
+        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        id_usuario INT NOT NULL REFERENCES usuario(id_usuario)
+      );
+
+      CREATE TABLE IF NOT EXISTS item_carrito (
+        id_item SERIAL PRIMARY KEY,
+        cantidad INT NOT NULL CHECK (cantidad > 0),
+        id_carrito INT NOT NULL REFERENCES carrito_compra(id_carrito),
+        id_variante INT NOT NULL REFERENCES variante_producto(id_variante)
+      );
+    `);
+
+    try {
+      const resClienteHist = await pool.query(`
+        INSERT INTO usuario (nombre, correo, contrasena_hash, rol)
+        VALUES ('Cliente Historico', 'cliente.hist@atelier.com', crypt('123456', gen_salt('bf')), 'cliente')
+        RETURNING id_usuario
+      `);
+      const clienteHistId = resClienteHist.rows[0].id_usuario;
+
+      await pool.query(`
+        INSERT INTO sesion_usuario (id_usuario, token_hash, fecha_expiracion)
+        VALUES ($1, 'hash_sesion_cliente_hist', NOW() + INTERVAL '1 hour')
+      `, [clienteHistId]);
+
+      const resPedidoHist = await pool.query(`
+        INSERT INTO pedido (id_usuario, total, estado)
+        VALUES ($1, 45000, 'entregado')
+        RETURNING id_pedido
+      `, [clienteHistId]);
+      const pedidoHistId = resPedidoHist.rows[0].id_pedido;
+
+      const resClienteSin = await pool.query(`
+        INSERT INTO usuario (nombre, correo, contrasena_hash, rol)
+        VALUES ('Cliente Sin Historial', 'cliente.sin@atelier.com', crypt('123456', gen_salt('bf')), 'cliente')
+        RETURNING id_usuario
+      `);
+      const clienteSinId = resClienteSin.rows[0].id_usuario;
+
+      await pool.query(`
+        INSERT INTO sesion_usuario (id_usuario, token_hash, fecha_expiracion)
+        VALUES ($1, 'hash_sesion_cliente_sin', NOW() + INTERVAL '1 hour')
+      `, [clienteSinId]);
+
+      const resCarrito = await pool.query(`
+        INSERT INTO carrito_compra (id_usuario)
+        VALUES ($1)
+        RETURNING id_carrito
+      `, [clienteSinId]);
+
+      await pool.query(`
+        INSERT INTO item_carrito (cantidad, id_carrito, id_variante)
+        VALUES (1, $1, $2)
+      `, [resCarrito.rows[0].id_carrito, varianteA]);
+
+      await pool.query(migracion005Sql);
+
+      const tablas = await pool.query(`
+        SELECT
+          to_regclass('public.item_carrito') AS item_carrito,
+          to_regclass('public.carrito_compra') AS carrito_compra
+      `);
+      expect(tablas.rows[0]).toEqual({
+        item_carrito: null,
+        carrito_compra: null
+      });
+
+      const sinHist = await pool.query(
+        'SELECT id_usuario FROM usuario WHERE id_usuario = $1',
+        [clienteSinId]
+      );
+      expect(sinHist.rows).toHaveLength(0);
+
+      const conHist = await pool.query(
+        'SELECT id_usuario, rol FROM usuario WHERE id_usuario = $1',
+        [clienteHistId]
+      );
+      expect(conHist.rows).toHaveLength(1);
+
+      const pedidoConservado = await pool.query(
+        'SELECT id_pedido, id_usuario FROM pedido WHERE id_pedido = $1',
+        [pedidoHistId]
+      );
+      expect(pedidoConservado.rows).toHaveLength(1);
+
+      const sesionRevocada = await pool.query(
+        'SELECT fecha_revocacion FROM sesion_usuario WHERE id_usuario = $1',
+        [clienteHistId]
+      );
+      expect(sesionRevocada.rows).toHaveLength(1);
+      expect(sesionRevocada.rows[0].fecha_revocacion).not.toBeNull();
+
+      const loginLegado = await request(app)
+        .post('/api/auth/login')
+        .send({ correo: 'cliente.hist@atelier.com', contrasena: '123456' });
+      expect(loginLegado.status).toBe(401);
+
+      await expect(pool.query(migracion005Sql)).resolves.toBeDefined();
+
+      const pedidoTrasReejecucion = await pool.query(
+        'SELECT id_pedido FROM pedido WHERE id_pedido = $1',
+        [pedidoHistId]
+      );
+      expect(pedidoTrasReejecucion.rows).toHaveLength(1);
+    } finally {
+      await pool.query('DROP TABLE IF EXISTS item_carrito');
+      await pool.query('DROP TABLE IF EXISTS carrito_compra');
+      await pool.query("DELETE FROM pedido WHERE id_usuario IN (SELECT id_usuario FROM usuario WHERE rol = 'cliente')");
+      await pool.query("DELETE FROM sesion_usuario WHERE id_usuario IN (SELECT id_usuario FROM usuario WHERE rol = 'cliente')");
+      await pool.query("DELETE FROM usuario WHERE rol = 'cliente'");
+      await pool.query(`
+        ALTER TABLE usuario DROP CONSTRAINT IF EXISTS usuario_rol_check;
+        ALTER TABLE usuario
+          ADD CONSTRAINT usuario_rol_check CHECK (rol IN ('vendedor', 'administrador'));
+      `);
     }
   });
 });
