@@ -1,4 +1,4 @@
-﻿const fs = require('node:fs');
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const request = require('supertest');
@@ -325,7 +325,34 @@ describe('Issue #49 — Validación integral del backend y consistencia de datos
     const netoA = resumenMovs.rows.find(r => r.id_variante === varianteA).neto_movimientos;
     const netoB = resumenMovs.rows.find(r => r.id_variante === varianteB).neto_movimientos;
 
-    const ventasDetalle = await pool.query('SELECT id_variante, COALESCE(SUM(cantidad), 0)::int AS vendidos FROM detalle_pedido WHERE id_variante IN ($1, $2) GROUP BY id_variante', [varianteA, varianteB]); const vendA = ventasDetalle.rows.find(r => r.id_variante === varianteA).vendidos; const vendB = ventasDetalle.rows.find(r => r.id_variante === varianteB).vendidos; expect(10 + netoA - vendA).toBe(23); expect(10 + netoB - vendB).toBe(20);
+    // Las ventas ya generan movimientos de salida.
+    // No descontar nuevamente sus detalles.
+    expect(10 + netoA).toBe(23);
+    expect(10 + netoB).toBe(20);
+
+    const salidasVenta = await pool.query(
+      `SELECT id_variante, cantidad, id_usuario
+       FROM movimiento_inventario
+       WHERE tipo = 'salida' AND motivo = $1
+       ORDER BY id_variante`,
+      [`Registro de venta #${idPedido}`]
+    );
+
+    expect(salidasVenta.rows).toHaveLength(2);
+    expect(salidasVenta.rows).toEqual(
+      expect.arrayContaining([
+        {
+          id_variante: varianteA,
+          cantidad: 5,
+          id_usuario: vendedorId
+        },
+        {
+          id_variante: varianteB,
+          cantidad: 4,
+          id_usuario: vendedorId
+        }
+      ])
+    );
   });
 
   test('INT-03: trazabilidad completa en auditoría e inmutabilidad ante rol de aplicación', async () => {

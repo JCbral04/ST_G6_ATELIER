@@ -356,7 +356,7 @@ describe('Issue #28 — Integridad transaccional ACID', () => {
     expect(await stock(varianteB)).toBe(10);
 
     const datos = await estadoTransaccional();
-    expect(datos.movimientos).toBe(2);
+    expect(datos.movimientos).toBe(4);
   });
 });
 
