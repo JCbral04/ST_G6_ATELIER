@@ -74,7 +74,8 @@ async function getAlertasStockBajo(req, res) {
       JOIN producto p ON v.id_producto = p.id_producto
       JOIN talla t ON v.id_talla = t.id_talla
       JOIN color col ON v.id_color = col.id_color
-      WHERE v.stock <= p.stock_minimo
+      WHERE p.activo = TRUE
+        AND v.stock <= p.stock_minimo
       ORDER BY v.stock ASC;
     `;
     const result = await pool.query(query);

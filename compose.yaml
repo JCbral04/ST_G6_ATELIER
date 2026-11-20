@@ -1,0 +1,74 @@
+name: atelier-iac
+
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: atelier_demo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Configura APP_DB_PASSWORD en .env}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:?Configura AI_DB_PASSWORD en .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/atelier/db:ro
+      - ./infrastructure/postgres/init.sh:/docker-entrypoint-initdb.d/10-atelier.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'test -f "$$PGDATA/.atelier-init-complete" && pg_isready -h 127.0.0.1 -U postgres -d atelier_demo']
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 20s
+
+  ai:
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+    environment:
+      PORT: '8000'
+      AI_DATABASE_URL: host=db port=5432 dbname=atelier_demo user=ai_readonly
+      PGPASSWORD: ${AI_DB_PASSWORD:?Configura AI_DB_PASSWORD en .env}
+      AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?Configura AI_INTERNAL_KEY en .env}
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).close()"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 15s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_NAME: atelier_demo
+      DB_USER: atelier_app
+      DB_PASSWORD: ${APP_DB_PASSWORD:?Configura APP_DB_PASSWORD en .env}
+      AI_SERVICE_URL: http://ai:8000
+      AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?Configura AI_INTERNAL_KEY en .env}
+    ports:
+      - '127.0.0.1:${ATELIER_PORT:-3001}:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok || !(await r.json()).base_de_datos) process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres_data:

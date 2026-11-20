@@ -1,0 +1,23 @@
+# Contexto mínimo: no enviar bases, documentación, Git ni entornos locales.
+*
+!backend/
+!backend/package.json
+!backend/package-lock.json
+!backend/server.js
+!backend/src/
+!backend/src/**
+!frontend/
+!frontend/**
+!ai-service/
+!ai-service/requirements.txt
+!ai-service/main.py
+!ai-service/database.py
+!ai-service/model.py
+**/.env
+**/.env.*
+**/node_modules
+**/.git
+**/.venv
+**/__pycache__
+**/*.pem
+**/*.key

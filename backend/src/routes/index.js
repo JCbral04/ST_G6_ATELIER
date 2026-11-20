@@ -24,8 +24,13 @@ router.get('/health', async (req, res) => {
 router.use('/pedidos', require('./pedido.routes'));
 router.use('/auth', require('./auth.routes'));
 router.use('/inventario/movimientos', require('./movimiento.routes')); // Issue #26
+router.use('/compras', require('./compra.routes'));
+router.use('/proveedores', require('./proveedor.routes'));
 
 // Rutas de gestión de información (RF-06, RF-09, RF-10)
 router.use('/', gestionRoutes);
+
+// Microservicio de IA
+router.use('/ia', require('./ia.routes'));
 
 module.exports = router;

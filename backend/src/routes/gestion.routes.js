@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
+const { autenticar, permitirRoles } = require('../middleware/auth');
 const {
   getProductosConStock,
   getInventario,
@@ -17,9 +18,15 @@ const limiter = rateLimit({
   message: { error: 'Demasiadas peticiones, intenta más tarde' },
 });
 
-// Rutas con rate limiting
-router.get('/productos', limiter, getProductosConStock);
-router.get('/inventario', limiter, getInventario);
-router.get('/inventario/alertas', limiter, getAlertasStockBajo);
+const autorizarConsulta = [
+  limiter,
+  autenticar,
+  permitirRoles('administrador', 'vendedor'),
+];
+
+// Rutas protegidas por sesión y rol (sin middleware global sobre '/')
+router.get('/productos', ...autorizarConsulta, getProductosConStock);
+router.get('/inventario', ...autorizarConsulta, getInventario);
+router.get('/inventario/alertas', ...autorizarConsulta, getAlertasStockBajo);
 
 module.exports = router;
