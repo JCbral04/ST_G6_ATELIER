@@ -19,6 +19,9 @@
 
     render() {
       const s = A.store;
+      const invOk = A.api.disponible('variantes');
+      const ventasOk = A.api.disponible('pedidos');
+      const anular = A.api.puede('anular').ok;
       const bajos = s.variantes.filter(A.isLow).sort(function (a, b) { return a.stock - b.stock; });
       const hoy = new Date().toDateString();
       const ventasHoy = s.pedidos.filter(function (p) {
@@ -34,18 +37,18 @@
         <div class="tag-grande">
           <span class="tag-grande-ojal" aria-hidden="true"></span>
           <p class="tag-grande-fecha">Vendido hoy, ${esc(hoyLargo())}</p>
-          <p class="tag-grande-total">${fmt(totalHoy)}</p>
-          <dl class="tag-grande-datos">
+          <p class="tag-grande-total">${ventasOk ? fmt(totalHoy) : '—'}</p>
+          ${ventasOk ? `<dl class="tag-grande-datos">
             <div><dt>Ventas</dt><dd>${ventasHoy.length}</dd></div>
             <div><dt>Promedio por venta</dt><dd>${fmt(promedio)}</dd></div>
-          </dl>
+          </dl>` : `<p class="tag-grande-fecha">No se pudieron cargar las ventas.</p>`}
         </div>
 
         <div class="resumen-avisos">
-          <a class="aviso ${bajos.length ? 'aviso-violeta' : ''}" href="#/inventario" data-reponer>
+          ${invOk ? `<a class="aviso ${bajos.length ? 'aviso-violeta' : ''}" href="#/inventario" data-reponer>
             <b>${bajos.length}</b><span>${bajos.length === 1 ? 'variante por reponer' : 'variantes por reponer'}</span>
-          </a>
-          ${A.app.can('compras') ? `<a class="aviso" href="#/compras">
+          </a>` : ''}
+          ${A.app.can('compras') && A.api.disponible('compras') ? `<a class="aviso" href="#/compras">
             <b>${porRecibir.length}</b><span>${porRecibir.length === 1 ? 'compra por recibir' : 'compras por recibir'}</span>
           </a>` : ''}
         </div>
@@ -54,7 +57,7 @@
       <div class="resumen-cols">
         <section>
           <h3 class="sec">Por reponer</h3>
-          ${bajos.length ? `<div class="clavadas">${bajos.map(function (v, i) {
+          ${!invOk ? A.noDisponible('No se pudo cargar el inventario.', A.frase(A.api.motivo('variantes'))) : bajos.length ? `<div class="clavadas">${bajos.map(function (v, i) {
             const pct = Math.max(4, Math.min(100, Math.round(v.stock / Math.max(1, v.stock_minimo) * 100)));
             return `<article class="clavada" style="--giro:${(i % 3 - 1) * 1.6}deg">
               <span class="alfiler" aria-hidden="true"></span>
@@ -71,11 +74,17 @@
 
         <section>
           <h3 class="sec">Últimas ventas</h3>
-          ${ultimas.length ? `<div class="tiquetes">${ultimas.map(function (p) {
-            return `<article class="tiquete">
+          ${!ventasOk ? A.noDisponible('No se pudieron cargar las ventas.', A.frase(A.api.motivo('pedidos'))) : ultimas.length ? `<div class="tiquetes" id="tiquetes">${ultimas.map(function (p) {
+            const anulada = p.estado === 'cancelado';
+            const anulable = anular && ['pendiente', 'confirmado'].indexOf(p.estado) !== -1;
+            return `<article class="tiquete ${anulada ? 'anulado' : ''}">
               <div class="tiquete-fila"><b>Pedido ${esc(p.id_pedido)}</b><span>${esc(A.hora(p.fecha))}</span></div>
-              <div class="tiquete-fila sub"><span>${esc(p.usuario)}</span><span class="pill ${p.estado === 'cancelado' ? 'pill-warn' : 'pill-ok'}">${esc(p.estado)}</span></div>
-              <div class="tiquete-total">${fmt(p.total)}</div>
+              <div class="tiquete-fila sub"><span>${esc(p.usuario)}</span><span class="pill ${anulada ? 'pill-warn' : 'pill-ok'}">${anulada ? 'anulada' : esc(p.estado)}</span></div>
+              <div class="remision-pie">
+                ${anulable ? `<span class="anular" data-anular="${esc(p.id_pedido)}">
+                  <button type="button" class="link-btn oscuro" data-paso="pedir">Anular venta</button></span>` : '<span></span>'}
+                <span class="tiquete-total">${fmt(p.total)}</span>
+              </div>
             </article>`;
           }).join('')}</div>` : '<div class="empty">Todavía no hay ventas. Regístralas desde Vender.</div>'}
         </section>
@@ -85,6 +94,37 @@
     bind(root) {
       const link = root.querySelector('[data-reponer]');
       if (link) link.addEventListener('click', function () { A.views.inventario.soloPorReponer(); });
+
+      // Anular venta (solo administrador): pide confirmación en el mismo tiquete
+      const lista = root.querySelector('#tiquetes');
+      if (!lista) return;
+      lista.addEventListener('click', async function (e) {
+        const b = e.target.closest('button[data-paso]');
+        if (!b) return;
+        const caja = b.closest('[data-anular]');
+        const id = Number(caja.dataset.anular);
+        if (b.dataset.paso === 'pedir') {
+          caja.innerHTML = `<span class="confirma">¿Anular y devolver el stock?
+            <button type="button" class="btn-mini peligro" data-paso="si">Sí, anular</button>
+            <button type="button" class="link-btn oscuro" data-paso="no">No</button></span>`;
+          caja.querySelector('[data-paso="si"]').focus();
+        } else if (b.dataset.paso === 'no') {
+          caja.innerHTML = '<button type="button" class="link-btn oscuro" data-paso="pedir">Anular venta</button>';
+        } else if (b.dataset.paso === 'si') {
+          b.disabled = true;
+          try {
+            const r = await A.api.cancelarVenta(id);
+            A.toast(r.demo
+              ? '<b>Venta ' + esc(id) + ' anulada en la demo.</b> Las prendas volvieron al inventario de prueba; no se guardó en la base de datos.'
+              : '<b>Venta ' + esc(id) + ' anulada.</b> Las prendas volvieron al inventario.');
+            A.app.refresh();
+          } catch (err) {
+            if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
+            b.disabled = false;
+            A.toast('<b>No se pudo anular la venta.</b> ' + esc(A.frase(err.message)));
+          }
+        }
+      });
     },
   };
 })(window.Atelier);

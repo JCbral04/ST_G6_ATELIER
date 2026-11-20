@@ -54,17 +54,6 @@
       }
       toggle.addEventListener('click', function () { setVisible(pass.type === 'password'); pass.focus(); });
 
-      // Cuentas de prueba del talón: llenan el formulario
-      form.querySelectorAll('[data-demo]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          correo.value = b.dataset.demo;
-          pass.value = '123456';
-          formErr.textContent = '';
-          validateCorreo(correo); validateContrasena(pass);
-          form.querySelector('button[type=submit]').focus();
-        });
-      });
-
       // Valida al salir del campo y corrige en vivo una vez marcado como inválido
       correo.addEventListener('blur', function () { validateCorreo(correo); });
       pass.addEventListener('blur', function () { validateContrasena(pass); });
@@ -77,31 +66,73 @@
         if (pass.closest('.field').classList.contains('invalid')) validateContrasena(pass);
       });
 
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
+      function camposOk() {
         const ok = [validateCorreo(correo), validateContrasena(pass)].every(Boolean);
         if (!ok) {
           (form.querySelector('.invalid input') || correo).focus();
           nudge();
-          return;
         }
-        // Autenticación provisional contra los usuarios del seed.
-        // La autenticación real (POST /api/auth/login, RF-01) llega en Fase 4.
-        const user = A.mock.usuarios.find(function (u) {
-          return u.correo === correo.value.trim().toLowerCase();
-        });
-        if (!user || pass.value !== '123456') {
-          formErr.textContent = 'Correo o contraseña incorrectos.';
-          pass.value = '';
-          pass.closest('.field').classList.remove('valid');
-          pass.focus();
-          nudge();
-          return;
-        }
+        return ok;
+      }
+      // Un solo intento de entrada a la vez: mientras uno está en curso,
+      // el botón de ingresar y los de la demo quedan bloqueados (también en la lógica).
+      const btnLogin = form.querySelector('button[type=submit]');
+      const btnsDemo = Array.prototype.slice.call(document.querySelectorAll('[data-demo-rol]'));
+      let autenticando = false;
+      function bloquear(si) {
+        autenticando = si;
+        btnLogin.disabled = si;
+        btnsDemo.forEach(function (b) { b.disabled = si; });
+        form.setAttribute('aria-busy', String(si));
+      }
+
+      // Espera a que el panel termine de abrir antes de soltar el bloqueo
+      async function entrar(sesion) {
         form.reset();
         setVisible(false);
+        formErr.textContent = '';
         form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('valid', 'invalid'); });
-        onSuccess(user);
+        await onSuccess(sesion);
+      }
+      function fallo(err) {
+        formErr.textContent = err.message || 'No se pudo iniciar sesión.';
+        pass.value = '';
+        pass.closest('.field').classList.remove('valid');
+        pass.focus();
+        nudge();
+      }
+
+      // Sesión real: POST /api/auth/login (PR #34). Si no hay servidor, no entra
+      // en demo por su cuenta: lo dice y la persona decide.
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (autenticando || !camposOk()) return;
+        bloquear(true);
+        btnLogin.textContent = 'Ingresando…';
+        try {
+          await entrar(await A.api.login(correo.value.trim().toLowerCase(), pass.value));
+        } catch (err) {
+          if (!err.obsoleta) fallo(err);
+        } finally {
+          bloquear(false);
+          btnLogin.textContent = 'Ingresar';
+        }
+      });
+
+      // Demo explícita con usuarios ficticios: sin contraseña ni peticiones a la API.
+      // Las credenciales reales nunca se muestran en esta pantalla.
+      btnsDemo.forEach(function (b) {
+        b.addEventListener('click', async function () {
+          if (autenticando) return;
+          bloquear(true);
+          try {
+            await entrar(A.api.loginDemo(b.dataset.demoRol));
+          } catch (err) {
+            fallo(err);
+          } finally {
+            bloquear(false);
+          }
+        });
       });
     },
   };

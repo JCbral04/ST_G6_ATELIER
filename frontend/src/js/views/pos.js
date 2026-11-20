@@ -3,7 +3,8 @@
    Cada producto es una muestra de tela de su color, con la prenda trazada
    como molde; el empleado elige color y talla en la cinta métrica y la
    prenda pasa a la venta actual (ticket).
-   La venta se registra con POST /api/pedidos; sin API se simula.
+   La venta se registra con POST /api/pedidos. En sesión real solo se
+   vende si el inventario viene de la API; en modo demo se simula.
    ============================================================= */
 (function (A) {
   'use strict';
@@ -134,6 +135,11 @@
     roles: ['administrador', 'vendedor'],
 
     render() {
+      if (!A.api.puede('vender').ok) {
+        A.store.venta = [];
+        return A.noDisponible('Las ventas están desactivadas.',
+          A.api.puede('vender').motivo + ' El punto de venta solo vende prendas del inventario real, para no registrar prendas que no existen en la base de datos.');
+      }
       const cats = A.store.variantes.map(function (v) { return v.categoria; })
         .filter(function (c, i, arr) { return c && arr.indexOf(c) === i; });
       return `
@@ -164,6 +170,7 @@
     },
 
     bind(root) {
+      if (!root.querySelector('#pos-search')) return;   // ventas desactivadas
       function repaint() {
         root.querySelector('#muestrario').innerHTML = muestrarioHtml();
         root.querySelector('#venta-lines').innerHTML = ticketHtml();
@@ -230,18 +237,21 @@
         } else if (t.id === 'checkout') {
           t.disabled = true;
           try {
-            const r = await A.api.registrarVenta(A.session.id_usuario, items);
+            const r = await A.api.registrarVenta(items);
             A.store.venta = [];
             // El ticket se "corta" y sale volando antes de empezar una venta nueva
             if (!sinMovimiento) {
               root.querySelector('#venta').classList.add('cortado');
               await new Promise(function (ok) { setTimeout(ok, 520); });
             }
-            A.toast('<b>Venta confirmada.</b> Pedido ' + esc(r.id_pedido) + ' por ' + fmt(r.total) + '. El stock ya se descontó.');
+            A.toast(r.demo
+              ? '<b>Venta simulada.</b> Pedido ' + esc(r.id_pedido) + ' por ' + fmt(r.total) + '. Es modo demo: no se guardó en la base de datos.'
+              : '<b>Venta confirmada.</b> Pedido ' + esc(r.id_pedido) + ' por ' + fmt(r.total) + '. El stock ya se descontó.');
             A.app.refresh();
           } catch (err) {
             t.disabled = false;
-            A.toast('<b>No se confirmó la venta.</b> ' + esc(err.message) + '. El inventario no cambió.');
+            if (err.vencida || err.obsoleta) return;   // la sesión cambió: nada que mostrar
+            A.toast('<b>No se confirmó la venta.</b> ' + esc(A.frase(err.message)) + (err.status === 0 ? '' : ' El inventario no cambió.'));
           }
         }
       });

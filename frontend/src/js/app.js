@@ -10,6 +10,7 @@
   let current = null;
 
   function allowed() {
+    if (!A.session) return [];
     return ORDER.filter(function (k) { return A.views[k].roles.indexOf(A.session.rol) !== -1; });
   }
 
@@ -20,7 +21,7 @@
     }).join('');
   }
 
-  // Mueve el broche del metro hasta la sección activa
+  // Mueve el fondo negro hasta la sección activa
   function moverBroche() {
     const on = document.querySelector('#nav a.on');
     const slider = document.querySelector('#nav .nav-slider');
@@ -29,31 +30,22 @@
     slider.style.transform = 'translateX(' + on.offsetLeft + 'px)';
   }
 
-  // Números del metro: uno por cada rayita larga (cada 40px)
-  function numerarMetro() {
-    const cont = $('tape-num');
-    const n = Math.ceil(cont.offsetWidth / 40);
-    let html = '';
-    for (let i = 1; i <= n; i++) html += '<span style="left:' + (i * 40) + 'px">' + i + '</span>';
-    cont.innerHTML = html;
-  }
-
   function updateChrome() {
     const low = A.store.variantes.filter(A.isLow).length;
     $('low-count').textContent = low;
-    const canInv = A.app.can('inventario');
-    $('bell').hidden = !canInv;
+    // Sin inventario real no se puede afirmar cuánto hay por reponer
+    $('bell').hidden = !A.app.can('inventario') || !A.api.disponible('variantes');
     const src = A.api.sourceLabel();
     const pill = $('data-source');
     pill.textContent = src.text;
     pill.className = 'pill ' + src.cls;
-    pill.title = A.store.apiOnline
-      ? 'API conectada. Los recursos sin endpoint usan datos de respaldo.'
-      : 'API no disponible: se muestran datos de prueba del seed.';
+    pill.title = src.title;
+    $('demo-banner').hidden = !A.api.esDemo();
   }
 
   function show(view) {
     const list = allowed();
+    if (!list.length) return;
     if (list.indexOf(view) === -1) view = list[0];
     current = view;
     const v = A.views[view];
@@ -83,43 +75,68 @@
     show(location.hash.replace(/^#\/?/, '') || 'pos');
   }
 
-  async function enterApp() {
+  async function enterApp(sesion) {
+    A.api.iniciar(sesion);
+    const ctx = A.api.contexto();
+    // Defensa extra: un rol sin vistas no entra al panel
+    if (!allowed().length) {
+      logout();
+      $('login-error').textContent = 'Tu cuenta no tiene acceso al panel de la tienda.';
+      return;
+    }
     $('login').hidden = true;
     $('app').hidden = false;
     $('user-name').textContent = A.session.nombre;
     $('user-role').textContent = A.session.rol;
+    $('demo-banner').hidden = !A.api.esDemo();
     renderNav();
-    numerarMetro();
     $('screen').innerHTML = '<div class="empty">Cargando datos…</div>';
-    await A.api.load();
+    try {
+      await A.api.load();
+    } catch (e) {
+      return;   // la sesión venció o cambió mientras cargaba
+    }
+    if (!A.api.vigente(ctx)) return;   // otra sesión empezó: no pintar esta
     route();
   }
 
+  // La sesión local se cierra de una; la revocación en el servidor sigue
+  // por su lado con el token viejo y no vuelve a tocar nada al terminar.
   function logout() {
-    A.session = null;
-    A.store.venta = [];
-    A.storage.remove('atelier.session');
+    A.api.logout();
+    salir();
+  }
+
+  function salir() {
+    current = null;
+    const t = $('toast');
+    clearTimeout(t._h);
+    t.classList.remove('show');
     $('app').hidden = true;
     $('login').hidden = false;
+    $('screen').replaceChildren();
     history.replaceState(null, '', location.pathname);
     $('correo').focus();
   }
 
   A.app = {
-    refresh: function () { if (current) show(current); },
+    refresh: function () { if (current && A.session) show(current); },
     can: function (view) { return !!A.session && A.views[view].roles.indexOf(A.session.rol) !== -1; },
+    // Token vencido o revocado: volver al login con un aviso, sin pasar a demo
+    sesionVencida: function () {
+      if (!A.session) return;
+      A.api.olvidarSesion();
+      salir();
+      $('login-error').textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
+    },
   };
 
   document.addEventListener('DOMContentLoaded', function () {
-    A.login.init(function (user) {
-      A.session = user;
-      A.storage.set('atelier.session', user);
-      enterApp();
-    });
+    A.login.init(enterApp);
 
     $('logout-btn').addEventListener('click', logout);
     window.addEventListener('hashchange', route);
-    window.addEventListener('resize', function () { if (A.session) { numerarMetro(); moverBroche(); } });
+    window.addEventListener('resize', function () { if (A.session) moverBroche(); });
     // Las fuentes cambian el ancho de las secciones: recolocar el broche cuando carguen
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (A.session) moverBroche(); });
     // Los avisos de "por reponer" abren el inventario ya filtrado
@@ -128,14 +145,13 @@
       if (current === 'inventario') A.app.refresh();
     });
 
-    // Recuperar sesión de la pestaña (solo datos públicos del usuario, nunca la contraseña)
-    const saved = A.storage.get('atelier.session');
-    const valid = saved && A.mock.usuarios.find(function (u) { return u.correo === saved.correo; });
-    if (valid) {
-      A.session = valid;
-      enterApp();
-    } else {
+    // Recuperar la sesión de la pestaña (usuario y token, nunca la contraseña)
+    A.api.recuperarSesion().then(function (s) {
+      if (s) enterApp(s);
+      else $('login').hidden = false;
+    }, function (err) {
       $('login').hidden = false;
-    }
+      $('login-error').textContent = err.message;
+    });
   });
 })(window.Atelier);

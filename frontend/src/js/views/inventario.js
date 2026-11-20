@@ -11,7 +11,11 @@
 
   const EMPTY = { q: '', categoria: '', talla: '', color: '', estado: '' };
   let f = Object.assign({}, EMPTY);
-  let vista = 'fichas';   // 'fichas' (talla × color) o 'lista' (tabla por variante)
+  let vista = 'fichas';   // 'fichas' (talla × color), 'lista' (tabla por variante) o 'movimientos'
+  // Ajuste manual en curso (se conserva al cambiar filtros)
+  let ajuste = { id_variante: '', tipo: 'salida', cantidad: '', motivo: '' };
+  const MOTIVOS = { salida: ['Prenda dañada', 'Pérdida o robo', 'Devolución a proveedor', 'Conteo físico'],
+                    entrada: ['Devolución de cliente', 'Conteo físico', 'Prenda encontrada'] };
 
   function uniq(list) {
     return list.filter(function (x, i) { return x && list.indexOf(x) === i; });
@@ -116,7 +120,77 @@
       : '<div class="empty">Ninguna variante coincide con estos filtros. Prueba quitando alguno.</div>';
   }
 
-  function resultadosHtml() { return vista === 'lista' ? tablaHtml() : fichasHtml(); }
+  // Vista de movimientos: registrar un ajuste manual + historial (PR #30)
+  function movimientosHtml() {
+    const invOk = A.api.disponible('variantes');
+    const ids = filtrar().map(function (v) { return v.id_variante; });
+    // Sin inventario no hay con qué filtrar: se muestra todo el historial
+    const hist = A.store.movimientos
+      .filter(function (m) { return !invOk || ids.indexOf(Number(m.id_variante)) !== -1; })
+      .sort(function (a, b) { return new Date(b.fecha) - new Date(a.fecha) || b.id_movimiento - a.id_movimiento; })
+      .slice(0, 60);
+    const v = A.store.variantes.find(function (x) { return x.id_variante === Number(ajuste.id_variante); });
+
+    const puede = A.api.puede('ajustar');
+
+    return `<div class="mov-cols">
+      ${!puede.ok ? `<section class="orden ajuste">
+        <h3>Registrar ajuste</h3>
+        ${A.noDisponible('Los ajustes están desactivados.', puede.motivo)}
+      </section>` : `<form class="orden ajuste" id="ajuste" novalidate>
+        <h3>Registrar ajuste</h3>
+        <p class="orden-ayuda">Para entradas o salidas que no son ventas ni compras: daños, pérdidas, conteos o devoluciones.</p>
+        <label class="orden-campo">Prenda
+          <select name="id_variante" required>
+            <option value="">Elige la prenda</option>
+            ${A.store.variantes.map(function (x) {
+              return `<option value="${esc(x.id_variante)}" ${String(x.id_variante) === String(ajuste.id_variante) ? 'selected' : ''}>
+                ${esc(x.producto)}, talla ${esc(x.talla)}, ${esc(String(x.color).toLowerCase())} (${esc(x.sku)}: ${esc(x.stock)})</option>`;
+            }).join('')}
+          </select>
+        </label>
+        ${v ? `<div class="ajuste-prenda">${A.prenda.de(v, 'venta-thumb')}<span>Hay <b>${esc(v.stock)}</b> en bodega, mínimo ${esc(v.stock_minimo)}.</span></div>` : ''}
+        <div class="ajuste-fila">
+          <div class="vista-toggle" role="group" aria-label="Tipo de movimiento">
+            <button type="button" data-tipo="entrada" aria-pressed="${ajuste.tipo === 'entrada'}">Entrada</button>
+            <button type="button" data-tipo="salida" aria-pressed="${ajuste.tipo === 'salida'}">Salida</button>
+          </div>
+          <label class="mini-select">Cantidad <input name="cantidad" type="number" min="1" step="1" inputmode="numeric" value="${esc(ajuste.cantidad)}" required></label>
+        </div>
+        <label class="orden-campo">Motivo
+          <input name="motivo" maxlength="200" placeholder="¿Por qué entra o sale?" value="${esc(ajuste.motivo)}" required>
+        </label>
+        <div class="cat-chips motivos">${MOTIVOS[ajuste.tipo].map(function (m) {
+          return `<button type="button" class="chip-btn" data-motivo="${esc(m)}">${esc(m)}</button>`;
+        }).join('')}</div>
+        <p class="form-error" id="ajuste-error" role="alert"></p>
+        <button type="submit" class="btn btn-block">Registrar ${ajuste.tipo === 'entrada' ? 'entrada' : 'salida'}</button>
+        ${A.api.esDemo() ? '<p class="regla-fija">Modo demo: el ajuste se simula y no se guarda.</p>' : ''}
+      </form>`}
+
+      <section>
+        <h3 class="sec">Historial de movimientos</h3>
+        ${!A.api.disponible('movimientos') ? A.noDisponible('No se pudo cargar el historial.', A.frase(A.api.motivo('movimientos'))) : hist.length ? `<ol class="historial">${hist.map(function (m) {
+          const x = A.store.variantes.find(function (y) { return y.id_variante === Number(m.id_variante); }) || m;
+          return `<li class="mov mov-${esc(m.tipo)}">
+            ${A.prenda.de(x, 'inv-thumb')}
+            <div class="mov-info">
+              <div><b>${esc(m.sku)}</b> ${esc(m.producto)}, talla ${esc(m.talla)}, ${esc(String(m.color).toLowerCase())}</div>
+              <div class="sub">${esc(m.motivo)}. ${esc(m.usuario)}, ${esc(A.fecha(m.fecha))} ${esc(A.hora(m.fecha))}</div>
+            </div>
+            <b class="mov-cant">${m.tipo === 'entrada' ? '+' : '−'}${esc(m.cantidad)}</b>
+          </li>`;
+        }).join('')}</ol>` : '<div class="empty">No hay movimientos para estos filtros.</div>'}
+      </section>
+    </div>`;
+  }
+
+  function resultadosHtml() {
+    if (vista === 'movimientos') return movimientosHtml();
+    if (!A.api.disponible('variantes')) return '';   // el aviso ya está arriba
+    if (vista === 'lista') return tablaHtml();
+    return fichasHtml();
+  }
 
   A.views.inventario = {
     title: 'Inventario',
@@ -135,8 +209,9 @@
       };
 
       return `
-      <p class="inv-resumen"><b>${unidades.toLocaleString('es-CO')}</b> unidades en bodega en <b>${all.length}</b> variantes.
-        ${bajos ? `<b class="violeta">${bajos} por reponer.</b>` : 'Nada por reponer.'}</p>
+      ${A.api.disponible('variantes') ? `<p class="inv-resumen"><b>${unidades.toLocaleString('es-CO')}</b> unidades en bodega en <b>${all.length}</b> variantes.
+        ${bajos ? `<b class="violeta">${bajos} por reponer.</b>` : 'Nada por reponer.'}</p>`
+        : `<div class="inv-resumen">${A.noDisponible('No se pudo cargar el inventario.', A.frase(A.api.motivo('variantes')) + ' No se muestran datos de prueba en una sesión real.')}</div>`}
 
       <form class="inv-tools" id="inv-filters" role="search">
         <input class="search" id="f-q" name="q" type="search" placeholder="Busca por nombre o SKU" value="${esc(f.q)}" aria-label="Buscar">
@@ -152,6 +227,7 @@
           <div class="vista-toggle" role="group" aria-label="Vista">
             <button type="button" data-vista="fichas" aria-pressed="${vista === 'fichas'}">Fichas</button>
             <button type="button" data-vista="lista" aria-pressed="${vista === 'lista'}">Lista</button>
+            <button type="button" data-vista="movimientos" aria-pressed="${vista === 'movimientos'}">Movimientos</button>
           </div>
         </div>
       </form>
@@ -178,6 +254,51 @@
           form.querySelectorAll('[data-vista]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
         }
         pintar();
+      });
+
+      // Formulario de ajuste manual (vista Movimientos)
+      function err(msg) { const p = out.querySelector('#ajuste-error'); if (p) p.textContent = msg || ''; }
+      out.addEventListener('input', function (e) {
+        if (!e.target.closest('#ajuste') || !e.target.name) return;
+        ajuste[e.target.name] = e.target.value;
+        err('');
+      });
+      out.addEventListener('change', function (e) {
+        if (e.target.name === 'id_variante') { ajuste.id_variante = e.target.value; pintar(); }
+      });
+      out.addEventListener('click', function (e) {
+        const b = e.target.closest('#ajuste button[type=button]');
+        if (!b) return;
+        if (b.dataset.tipo) { ajuste.tipo = b.dataset.tipo; pintar(); }
+        if (b.dataset.motivo) {
+          ajuste.motivo = b.dataset.motivo;
+          const m = out.querySelector('#ajuste [name=motivo]');
+          m.value = ajuste.motivo; m.focus(); err('');
+        }
+      });
+      out.addEventListener('submit', async function (e) {
+        if (e.target.id !== 'ajuste') return;
+        e.preventDefault();
+        const cantidad = Number(ajuste.cantidad);
+        const motivo = String(ajuste.motivo || '').trim();
+        if (!ajuste.id_variante) { err('Elige la prenda del ajuste.'); return; }
+        if (!Number.isInteger(cantidad) || cantidad <= 0) { err('La cantidad debe ser un número entero mayor a 0.'); out.querySelector('#ajuste [name=cantidad]').focus(); return; }
+        if (!motivo) { err('Escribe el motivo del ajuste o elige uno de los sugeridos.'); out.querySelector('#ajuste [name=motivo]').focus(); return; }
+        const btn = e.target.querySelector('[type=submit]');
+        btn.disabled = true;
+        try {
+          const r = await A.api.registrarMovimiento({ id_variante: Number(ajuste.id_variante), tipo: ajuste.tipo, cantidad: cantidad, motivo: motivo });
+          // El stock del mensaje es el que devuelve la API (stock_actual), no el de la pantalla
+          const sku = r.sku || ((A.store.variantes.find(function (x) { return x.id_variante === Number(ajuste.id_variante); }) || {}).sku || '');
+          A.toast('<b>' + (ajuste.tipo === 'entrada' ? 'Entrada' : 'Salida') + (r.demo ? ' simulada.' : ' registrada.') + '</b> ' +
+            esc(sku) + ' ahora tiene ' + esc(r.stock_actual) + ' en bodega.' + (r.demo ? ' Es modo demo: no se guardó.' : ''));
+          ajuste = { id_variante: ajuste.id_variante, tipo: ajuste.tipo, cantidad: '', motivo: '' };
+          A.app.refresh();
+        } catch (ex) {
+          if (ex.vencida || ex.obsoleta) return;   // la sesión cambió: nada que mostrar
+          btn.disabled = false;
+          err(ex.status === 422 ? 'No hay suficiente stock para esa salida. ' + A.frase(ex.message) : 'No se pudo registrar el ajuste. ' + A.frase(ex.message));
+        }
       });
     },
 
