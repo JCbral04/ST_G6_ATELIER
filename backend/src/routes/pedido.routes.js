@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { pool } = require('../config/db');
 const rateLimit = require('express-rate-limit');
 const { autenticar, permitirRoles } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 const router = Router();
 
 const MAX_INT = 2147483647;
@@ -255,6 +256,18 @@ router.post('/', permitirRoles('vendedor', 'administrador'), async (req, res) =>
       [idPedido, `Registro de venta #${idPedido}`, id_usuario]
     );
 
+    // Auditoria en la misma transaccion de venta (RNF-09).
+    await registrarAuditoria(client, {
+      id_usuario,
+      accion: 'CREAR',
+      entidad: 'pedido',
+      id_entidad: idPedido,
+      detalle: {
+        total: Number(dinero(totalCentavos)),
+        items: lineas
+      }
+    });
+
     await client.query('COMMIT');
     res.status(201).json({
       mensaje: 'Venta registrada correctamente',
@@ -409,6 +422,18 @@ router.post(
         id_usuario
       ]
     );
+
+    // Auditoria en la misma transaccion de cancelacion.
+    await registrarAuditoria(client, {
+      id_usuario,
+      accion: 'ANULAR',
+      entidad: 'pedido',
+      id_entidad: idPedido,
+      detalle: {
+        estado_anterior: pedido.rows[0].estado,
+        estado_nuevo: 'cancelado'
+      }
+    });
 
     // 4. Confirmar la transacción completa
     await client.query('COMMIT');

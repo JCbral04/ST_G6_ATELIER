@@ -73,6 +73,7 @@ async function estadoTransaccional() {
 async function limpiarDatos() {
   await pool.query(`
     TRUNCATE TABLE
+      auditoria,
       detalle_pedido,
       pedido,
       movimiento_inventario,

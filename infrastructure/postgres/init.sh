@@ -35,6 +35,7 @@ GRANT CONNECT ON DATABASE atelier_demo TO atelier_app;
 GRANT USAGE ON SCHEMA public TO atelier_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO atelier_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO atelier_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE auditoria FROM atelier_app;
 GRANT EXECUTE ON FUNCTION public.precio_producto_activo(INTEGER) TO atelier_app;
 ALTER ROLE ai_readonly PASSWORD :'ai_password';
 SQL
