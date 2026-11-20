@@ -217,7 +217,7 @@
   // Ajustes manuales reales: apagados hasta que se integre el PR #37 y se
   // valide contra su contrato que POST /api/inventario/movimientos toma el
   // usuario del token y exige rol. Cambiar a true solo después de eso.
-  const AJUSTES_REALES = false;
+  const AJUSTES_REALES = true;
 
   function vaciar() {
     const s = A.store;

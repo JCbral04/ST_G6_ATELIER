@@ -688,3 +688,95 @@ img.inv-thumb { padding: 3px; object-fit: contain; }
   .pos { grid-template-columns: 1fr; }
   .venta { position: static; }
 }
+
+/* ATELIER - Reposicion inteligente */
+
+.ia-panel {
+  background: #fff;
+  border: 2px solid #171717;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.ia-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.ia-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ia-controls input {
+  width: 150px;
+  padding: 10px;
+  border: 1px solid #171717;
+  border-radius: 6px;
+}
+
+.ia-controls button {
+  background: #8c19dd;
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.ia-controls button:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+.ia-scroll {
+  overflow-x: auto;
+}
+
+.ia-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ia-table th,
+.ia-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+}
+
+.ia-table th {
+  background: #f2e8ff;
+}
+
+.ia-table td[data-riesgo="BAJO"] {
+  color: #16834b;
+  font-weight: bold;
+}
+
+.ia-table td[data-riesgo="MEDIO"] {
+  color: #a66a00;
+  font-weight: bold;
+}
+
+.ia-table td[data-riesgo="CRITICO"],
+.ia-table td[data-riesgo="ALTO"] {
+  color: #c62828;
+  font-weight: bold;
+}
+
+#ia-status {
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.ia-note {
+  margin-top: 20px;
+  font-size: .9rem;
+  color: #666;
+}

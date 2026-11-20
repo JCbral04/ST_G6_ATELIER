@@ -5,7 +5,7 @@
 (function (A) {
   'use strict';
 
-  const ORDER = ['pos', 'dashboard', 'inventario', 'compras'];   // el POS es la vista principal
+  const ORDER = ['pos', 'dashboard', 'inventario', 'compras', 'ia'];   // el POS es la vista principal
   const $ = function (id) { return document.getElementById(id); };
   let current = null;
 
