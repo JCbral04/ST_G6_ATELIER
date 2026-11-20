@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: atelier-erp
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    autoDeployTrigger: 'off'
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: DATABASE_URL
+        sync: false
+
+      - key: AI_SERVICE_URL
+        sync: false
+
+      - key: AI_INTERNAL_KEY
+        sync: false
+
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: "90000"
+
+  - type: web
+    name: atelier-ai
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    autoDeployTrigger: 'off'
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+
+    envVars:
+      - key: AI_DATABASE_URL
+        sync: false
+
+      - key: AI_INTERNAL_KEY
+        sync: false
+
+      - key: AI_DB_CONNECT_TIMEOUT
+        value: "15"
+
+      - key: AI_DB_STATEMENT_TIMEOUT_MS
+        value: "8000"
+
+      - key: OMP_NUM_THREADS
+        value: "1"
+
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+
+      - key: MKL_NUM_THREADS
+        value: "1"
