@@ -6,6 +6,6 @@
     "test": "node sesiones.e2e.js"
   },
   "devDependencies": {
-    "playwright": "1.49.1"
+    "playwright": "1.65.1"
   }
 }
