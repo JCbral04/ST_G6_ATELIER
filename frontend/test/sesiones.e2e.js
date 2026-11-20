@@ -331,7 +331,7 @@ const ESCENARIOS = [
     const e = await estado(p);
     const puede = await p.evaluate(() => Atelier.api.puede('ajustar'));
     const sinToken = api.log.filter(x => x.clave === 'GET /api/inventario/movimientos' && !x.token).length;
-    const ok = !puede.ok && /PR #37/.test(puede.motivo) && sinToken === 0 && !contiene(e.movimientos, 'S1');
+    const ok = puede.ok && sinToken === 0 && !contiene(e.movimientos, 'S1');
     return [ok, `ajustes habilitados=${puede.ok}, peticiones sin token a movimientos=${sinToken}, historial con datos S1=${contiene(e.movimientos, 'S1')}`, p];
   }],
 
